@@ -1,0 +1,99 @@
+#pragma once
+#include <BWAPI.h>
+
+#include <BWTA.h>
+#include <windows.h>
+
+#include <string>
+#include <sstream>
+#include <ctime>
+#include <list>
+#include <vector>
+#include <map>
+
+#include "Time.cpp"
+
+using namespace BWAPI;
+using namespace std;
+
+
+class TimerManager
+{
+
+	std::vector<Timer> timers;
+	std::vector<std::string> timerNames;
+
+	int barWidth;
+	double maxTimeConsume;
+	std::string maxTimerName;
+
+public:
+
+	enum Type { All, Worker, Production, Building, Attack, Scout, Information, tactic, strategy, Astar1, NumTypes };
+
+	TimerManager() : timers(std::vector<Timer>(NumTypes)), barWidth(40)
+	{
+		timerNames.push_back("Total");
+		timerNames.push_back("Worker");
+		timerNames.push_back("Production");
+		timerNames.push_back("Building");
+		timerNames.push_back("Attack");
+		timerNames.push_back("Scout");
+		timerNames.push_back("Information");
+		timerNames.push_back("tactic");
+		timerNames.push_back("strategy");
+		timerNames.push_back("Astar1");
+		maxTimeConsume = 0;
+		maxTimerName = "";
+	}
+
+	~TimerManager() {}
+
+	void startTimer(const TimerManager::Type t)
+	{
+		timers[t].start();
+	}
+
+	void stopTimer(const TimerManager::Type t)
+	{
+		timers[t].stop();
+	}
+
+	double getTotalElapsed()
+	{
+		return timers[0].getElapsedTimeInMilliSec();
+	}
+
+	void displayTimers(int x, int y)
+	{
+		BWAPI::Broodwar->drawBoxScreen(x - 5, y - 5, x + 110 + barWidth, y + 5 + (10 * timers.size()), BWAPI::Colors::Black, true);
+		BWAPI::Broodwar->drawTextScreen(x - 30, y - 50, "max frame time is : %.4f", maxTimeConsume);
+		BWAPI::Broodwar->drawTextScreen(x - 30, y - 30, "             from : %s", maxTimerName.c_str());
+
+		int yskip = 0;
+		double total = timers[0].getElapsedTimeInMilliSec();
+		for (size_t i(0); i < timers.size(); ++i)
+		{
+			double elapsed = timers[i].getElapsedTimeInMilliSec();
+
+			if (elapsed > maxTimeConsume )//&& timerNames[i] != "Total")
+			{
+				maxTimeConsume = elapsed;
+				maxTimerName = timerNames[i];
+			}
+
+			int width = (int)((elapsed == 0) ? 0 : (barWidth * (elapsed / total)));
+
+			BWAPI::Broodwar->drawTextScreen(x, y + yskip - 3, "\x04 %s", timerNames[i].c_str());
+			BWAPI::Broodwar->drawBoxScreen(x + 60, y + yskip, x + 60 + width + 1, y + yskip + 8, BWAPI::Colors::White);
+			BWAPI::Broodwar->drawTextScreen(x + 70 + barWidth, y + yskip - 3, "%.4lf", elapsed);
+			yskip += 10;
+		}
+	}
+
+	static TimerManager& Instance()
+	{
+		static TimerManager a;
+		return a;
+	}
+};

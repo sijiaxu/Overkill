@@ -1,0 +1,177 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Attack">
+      <UniqueIdentifier>{eb92724f-02c5-43a9-9260-864b0eb182a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Info">
+      <UniqueIdentifier>{edd417cd-8aca-497c-96c7-f6887279ab1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Macro">
+      <UniqueIdentifier>{aef27c30-cfe7-4d55-a7ac-033ddb36e833}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="sixZerglingTactic.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="TacticManager.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="ZerglingArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="AttackManager.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="BattleArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="BattleTactic.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="HydraliskArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="HydraliskTactic.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="MutaliskArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="MutaliskHarassTactic.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="Common.cpp">
+      <Filter>Info</Filter>
+    </ClCompile>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Info</Filter>
+    </ClCompile>
+    <ClCompile Include="InformationManager.cpp">
+      <Filter>Info</Filter>
+    </ClCompile>
+    <ClCompile Include="Options.cpp">
+      <Filter>Info</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildingData.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildingManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildOrderQueue.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="Overkill.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="ProductionManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="ScoutManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="StrategyManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="Time.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="WorkerData.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="WorkerManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="AstarPath.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="TimeManager.cpp">
+      <Filter>Macro</Filter>
+    </ClCompile>
+    <ClCompile Include="OverLordArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="sixZerglingTactic.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="TacticManager.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="UnitState.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="ZerglingArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="AttackManager.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="BattleArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="BattleTactic.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="HydraliskArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="HydraliskTactic.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="MutaliskArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="MutaliskHarassTactic.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.h">
+      <Filter>Info</Filter>
+    </ClInclude>
+    <ClInclude Include="InformationManager.h">
+      <Filter>Info</Filter>
+    </ClInclude>
+    <ClInclude Include="MetaType.h">
+      <Filter>Info</Filter>
+    </ClInclude>
+    <ClInclude Include="Options.h">
+      <Filter>Info</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildingData.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildingManager.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildOrderQueue.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="Overkill.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="ProductionManager.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="ScoutManager.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="StrategyManager.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="WorkerData.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="WorkerManager.h">
+      <Filter>Macro</Filter>
+    </ClInclude>
+    <ClInclude Include="AstarPath.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="OverLordArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
