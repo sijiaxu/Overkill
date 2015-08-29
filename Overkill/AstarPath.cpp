@@ -1,6 +1,15 @@
 #include "AstarPath.h"
 
 
+double diag_distance(double2 pos)
+{
+	double d = std::abs(pos.x) > std::abs(pos.y) ? std::abs(pos.y) : std::abs(pos.x);
+	double s = std::abs(pos.x) + std::abs(pos.y);
+
+	return d*1.4142135623730950488016887242097 + (s - d * 2);
+}
+
+
 // for attack path finding
 std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition, bool isFlyer, bool nearEndPosition)
 {
@@ -25,96 +34,84 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	double2 direct8(1, -1);
 	directions.push_back(direct8);
 
-	std::set<wayPoint> openPoints;
-	std::set<wayPoint> closePoints;
+	int width = BWAPI::Broodwar->mapWidth();
+	int heigth = BWAPI::Broodwar->mapHeight();
+ 
+	std::priority_queue<fValueGridPoint> openList;
+	//std::tr1::unordered_map<BWAPI::TilePosition, double> openListIndex;
+	std::vector<std::vector<double>> openListIndex;
+	openListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
 
-	wayPoint startPoint(startPosition, endPosition);
-	openPoints.insert(startPoint);
+	double hValue = diag_distance(double2(endPosition.x() - startPosition.x(), endPosition.y() - startPosition.y()));
+	openList.push(fValueGridPoint(startPosition, hValue));
+	openListIndex[startPosition.x()][startPosition.y()] = 0;
 
-	BWAPI::TilePosition backPosition;
+	//std::tr1::unordered_map<BWAPI::TilePosition, BWAPI::TilePosition> backtraceList;
+	std::vector<std::vector<BWAPI::TilePosition>> backtraceList;
+	backtraceList.resize(BWAPI::Broodwar->mapWidth(), std::vector<BWAPI::TilePosition>(BWAPI::Broodwar->mapHeight(), BWAPI::TilePositions::None));
+
+	//std::tr1::unordered_map<BWAPI::TilePosition, double> closeListIndex;
+	std::vector<std::vector<double>> closeListIndex;
+	closeListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
+
+	//backtraceList[startPosition] = startPosition;
+	backtraceList[startPosition.x()][startPosition.y()] = startPosition;
 
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
-
-	double farest = 0;
-	BWTA::Polygon p = BWTA::getRegion(endPosition)->getPolygon();
-	for (int j = 0; j < (int)p.size(); j++)
-	{
-		double distance = endPosition.getDistance(BWAPI::TilePosition(p[j]));
-		if (distance > farest)
-		{
-			farest = distance;
-		}
-	}
 	int expandRate;
+	BWAPI::TilePosition backPosition = BWAPI::TilePositions::None;
 
 	TimerManager::Instance().startTimer(TimerManager::Astar1);
 
-	int loop_time1 = 0;
-	int loop_time2 = 0;
-	int loop_time3 = 0;
 	int canNotFind = 0;
+	if (BWAPI::Broodwar->mapWidth() <= 128 && BWAPI::Broodwar->mapHeight() <= 128)
+	{
+		expandRate = 4;
+	}
+	else
+	{
+		expandRate = 8;
+	}
+
+	int loop1 = 0;
+	int loop2 = 0;
 
 	// if we expand the end, we find the optimal path
-	while (openPoints.size() > 0)
+	while (openList.size() > 0)
 	{
-		loop_time1++;
-
-		std::set<wayPoint>::iterator minPoint;
-		int minFvalue = 9999999;
-		double minEnemyForce = 9999;
-		double enemyForce;
-		for (std::set<wayPoint>::iterator it = openPoints.begin(); it != openPoints.end(); it++)
+		TimerManager::Instance().stopTimer(TimerManager::Astar1);
+		double elapseTime = TimerManager::Instance().getElapseTime(TimerManager::Astar1);
+		if (elapseTime > 50)
 		{
-			loop_time2++;
-
-			if (isFlyer)
-				enemyForce = influnceMap[it->wayPosition.y()][it->wayPosition.x()].airForce + influnceMap[it->wayPosition.y()][it->wayPosition.x()].decayAirForce + influnceMap[it->wayPosition.y()][it->wayPosition.x()].enemyUnitAirForce;
-			else
-				enemyForce = influnceMap[it->wayPosition.y()][it->wayPosition.x()].groundForce + influnceMap[it->wayPosition.y()][it->wayPosition.x()].decayGroundForce + influnceMap[it->wayPosition.y()][it->wayPosition.x()].enemyUnitGroundForce;
-			if ((enemyForce < minEnemyForce) || (enemyForce == minEnemyForce && it->cumulativeValue + it->heuristicValue < minFvalue))
-			{
-				minEnemyForce = enemyForce;
-				minFvalue = it->cumulativeValue + it->heuristicValue;
-				minPoint = it;
-			}
+			return std::list<BWAPI::TilePosition>();
 		}
+		loop1++;
 
-		wayPoint currentMinPoint = *minPoint;
-		openPoints.erase(minPoint);
-		closePoints.insert(currentMinPoint);
-
+		fValueGridPoint current = openList.top();
+		closeListIndex[current.position.x()][current.position.y()] = openListIndex[current.position.x()][current.position.y()];
+		openList.pop();
+		openListIndex[current.position.x()][current.position.y()] = -1;
+		
 		if (!nearEndPosition)
 		{
-			if (BWTA::getRegion(currentMinPoint.wayPosition) == BWTA::getRegion(endPosition))
+			if (BWTA::getRegion(current.position) == BWTA::getRegion(endPosition))
 			{
-				backPosition = currentMinPoint.wayPosition;
+				backPosition = current.position;
 				break;
 			}
 		}
 		else 
 		{
-			if (currentMinPoint.wayPosition.getDistance(endPosition) < 20)
+			if (current.position.getDistance(endPosition) < 10)
 			{
-				backPosition = currentMinPoint.wayPosition;
+				backPosition = current.position;
 				break;
 			}
 		}
 		
-		
-		if (BWAPI::Broodwar->mapWidth() <= 128 && BWAPI::Broodwar->mapHeight() <= 128)
-		{
-			expandRate = 4;
-		}
-		else
-		{
-			expandRate = 8;
-		}
-		
 		for (int i = 0; i < int(directions.size()); i++)
 		{
-			loop_time3++;
-
-			BWAPI::TilePosition nextTilePosition(currentMinPoint.wayPosition.x() + int(directions[i].x * expandRate), currentMinPoint.wayPosition.y() + int(directions[i].y * expandRate));
+			BWAPI::TilePosition nextTilePosition(current.position.x() + int(directions[i].x * expandRate), current.position.y() + int(directions[i].y * expandRate));
 
 			if (nextTilePosition.x() > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x() < 0 
 				|| nextTilePosition.y() > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y() < 0)
@@ -122,48 +119,49 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 				continue;
 			}
 
-			wayPoint nextPoint(nextTilePosition, endPosition);
-
-			//if point have already been expand, skip it 
-			if (closePoints.find(nextPoint) != closePoints.end())
-				continue;
-			// if point have already in open point, check the f value
-			if (openPoints.find(nextPoint) != openPoints.end())
-			{
-				openPoints.find(nextPoint)->checkParent(currentMinPoint);
-			}
+			double newCost = 0;
+			if (isFlyer)
+				newCost = openListIndex[current.position.x()][current.position.y()] + expandRate + (influnceMap[nextTilePosition.x()][nextTilePosition.y()].airForce +
+				influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayAirForce + influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitAirForce) * expandRate;
 			else
+				newCost = openListIndex[current.position.x()][current.position.y()] + expandRate + (influnceMap[nextTilePosition.x()][nextTilePosition.y()].groundForce +
+				influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayGroundForce + influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitGroundForce) * expandRate;
+
+			//if point have already been expand(if our heuristic function is admissible, this will not happen)
+			if (closeListIndex[nextTilePosition.x()][nextTilePosition.y()] != -1 && closeListIndex[nextTilePosition.x()][nextTilePosition.y()] > newCost)
+				closeListIndex[nextTilePosition.x()][nextTilePosition.y()] = -1;
+			// if point have already in open point, check the cost value
+			// since std::priority_queue do not have increase-priority interface, so we push the same position twice into the open list 
+			if (openListIndex[nextTilePosition.x()][nextTilePosition.y()] != -1 && openListIndex[nextTilePosition.x()][nextTilePosition.y()] > newCost)
+				openListIndex[nextTilePosition.x()][nextTilePosition.y()] = -1;
+
+			if (openListIndex[nextTilePosition.x()][nextTilePosition.y()] == -1 && closeListIndex[nextTilePosition.x()][nextTilePosition.y()] == -1)
 			{
-				nextPoint.setParent(currentMinPoint);
-				openPoints.insert(nextPoint);
+				loop2++;
+				double fvalue = newCost + diag_distance(double2(endPosition.x() - nextTilePosition.x(), endPosition.y() - nextTilePosition.y()));
+				openList.push(fValueGridPoint(nextTilePosition, fvalue));
+				openListIndex[nextTilePosition.x()][nextTilePosition.y()] = newCost;
+				backtraceList[nextTilePosition.x()][nextTilePosition.y()] = current.position;
 			}
 		}
 
 		//can not find the solution path
-		if (openPoints.size() == 0)
+		if (openList.size() == 0)
 		{
 			canNotFind = 1;
 			return std::list<BWAPI::TilePosition>();
 		}
 	}
-	/*
-	BWAPI::Broodwar->printf("loop1 : %d", loop_time1);
-	BWAPI::Broodwar->printf("loop2 : %d", loop_time2);
-	BWAPI::Broodwar->printf("loop3 : %d", loop_time3);
-	BWAPI::Broodwar->printf("can not find : %d", canNotFind);
-	*/
+	BWAPI::Broodwar->printf("loop1 %d", loop1);
+	BWAPI::Broodwar->printf("loop2 %d", loop2);
 
 
 	std::list<BWAPI::TilePosition> pathFind;
-
-	//pathFind.push_front(endPosition);
-
+	pathFind.push_front(backPosition);
 	while (backPosition != startPosition)
 	{
-		wayPoint temp(backPosition);
-		std::set<wayPoint>::iterator parent = closePoints.find(temp);
-		pathFind.push_front(parent->wayPosition);
-		backPosition = parent->parentPosition;
+		pathFind.push_front(backtraceList[backPosition.x()][backPosition.y()]);
+		backPosition = backtraceList[backPosition.x()][backPosition.y()];
 	}
 
 	if (isFlyer)

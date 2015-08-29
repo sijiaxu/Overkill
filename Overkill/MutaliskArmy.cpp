@@ -147,30 +147,35 @@ BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit* target, bool avoidCanno
 	int mutaliskAttackRange = BWAPI::UnitTypes::Zerg_Mutalisk.groundWeapon().maxRange() / 32;
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
 
-	int x = target->getTilePosition().x();//myUnit.unit->getTilePosition().x();
-	int y = target->getTilePosition().y();//myUnit.unit->getTilePosition().y();
+	double2 origin(target->getTilePosition().x(), target->getTilePosition().y());
+	int x = target->getTilePosition().x();
+	int y = target->getTilePosition().y();
 	int length = 1;
 	int j = 0;
 	bool first = true;
 	int dx = 0;
 	int dy = 1;
 
+	int buildingWidth = target->getType().tileWidth();
+	int buildingHeight = target->getType().tileHeight();
+	int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
+
 	while (length < 20)//BWAPI::Broodwar->mapWidth())
 	{
 		//if we can build here, return this tile position
 		if (x >= 0 && x < BWAPI::Broodwar->mapWidth() && y >= 0 && y < BWAPI::Broodwar->mapHeight())
 		{
-			if (!avoidCannon && influnceMap[y][x].airForce == 0 && influnceMap[y][x].enemyUnitAirForce == 0)
+			if (!avoidCannon && influnceMap[x][y].airForce == 0 && influnceMap[x][y].enemyUnitAirForce == 0)
 			{
 				return BWAPI::Position(x * 32, y * 32);
 			}
 
-			if (avoidCannon && influnceMap[y][x].airForce == 0)
+			if (avoidCannon && influnceMap[x][y].airForce == 0)
 			{
-				int buildingWidth = target->getType().tileWidth();
-				int buildingHeight = target->getType().tileHeight();
-				int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
-				if (BWAPI::TilePosition(x, y).getDistance(BWAPI::TilePosition(target->getPosition())) <= mutaliskAttackRange + maxSize)
+				double2 normalDirect = (double2(x, y) - origin).normal();
+				double2 safePosition(double2(x, y) + normalDirect);
+				//BWAPI::TilePosition(target->getPosition()) get the center of the building
+				if (BWAPI::TilePosition(int(safePosition.x + 0.5) , int(safePosition.y + 0.5)).getDistance(BWAPI::TilePosition(target->getPosition())) <= mutaliskAttackRange + maxSize)
 					return BWAPI::Position(x * 32, y * 32);
 			}
 		}
@@ -244,7 +249,7 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 			&& target->getType() != BWAPI::UnitTypes::Terran_Missile_Turret
 			&& target->getType() != BWAPI::UnitTypes::Zerg_Spore_Colony
 			&& target->getType() != BWAPI::UnitTypes::Terran_Bunker
-			&& influnceMap[unitCenter.y()][unitCenter.x()].airForce > 0
+			&& influnceMap[unitCenter.x()][unitCenter.y()].airForce > 0
 			&& BWAPI::Broodwar->getFrameCount() > myUnit.nextRetreatFrame)
 		{
 			myUnit.retreatPosition = findSafePlace(target, true);
@@ -365,7 +370,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition)
 				u->getType() == BWAPI::UnitTypes::Zerg_Spore_Colony ||
 				u->getType() == BWAPI::UnitTypes::Terran_Bunker)
 			{
-				if (imInfo[u->getTilePosition().y() + 1][u->getTilePosition().x() + 1].airForce / 20 <= units.size() / 4)
+				if (imInfo[u->getTilePosition().x() + 1][u->getTilePosition().y() + 1].airForce / 20 <= units.size() / 4)
 				{
 					priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), unit->getDistance(u)));
 					BWAPI::Broodwar->drawCircleMap(u->getPosition().x(), u->getPosition().y(), 4, BWAPI::Colors::Red, true);
@@ -374,8 +379,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition)
 			}
 			else
 			{
-				//TODO:: invisiable bug 
-				if (u->getType() == BWAPI::UnitTypes::Protoss_Observer)
+				if (u->isInvincible())
 					continue;
 				BWAPI::Position tmp = findSafePlace(u, true);
 				if (tmp != BWAPI::Positions::None)

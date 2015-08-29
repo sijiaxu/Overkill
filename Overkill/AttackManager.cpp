@@ -324,10 +324,9 @@ void AttackManager::DefendUpdate()
 	BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
 	{
 		//TODO: invisible unit can be get from api
-		if (myRegion.find(BWTA::getRegion(BWAPI::TilePosition(enemyUnit->getPosition()))) != myRegion.end())
+		if (myRegion.find(BWTA::getRegion(BWAPI::TilePosition(enemyUnit->getPosition()))) != myRegion.end() 
+			&& enemyUnit->isVisible())
 		{
-			if (enemyUnit->getType() == BWAPI::UnitTypes::Protoss_Observer)
-				continue;
 			// if we do not have anti-air army, ignore
 			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
 				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
@@ -466,24 +465,23 @@ void AttackManager::DefendOver()
 //TODO: cope with multiply enemy attack at the same time
 void AttackManager::DefendEnemy(std::set<BWAPI::Unit *>& enemyUnitsInRegion, int enemyTotalSupply)
 {
-
 	if (enemyUnitsInRegion.size() == 1 && (*enemyUnitsInRegion.begin())->getType().isWorker() && myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() == 0)
 	{
 		// the enemy worker that is attacking us
 		BWAPI::Unit * enemyWorker = *enemyUnitsInRegion.begin();
 
-		//if (enemyWorker->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation())) > 32 * 10)
-		//{
-			//WorkerManager::Instance().finishedWithCombatWorkers();
-		//}
-		//else
-		//{
-		// get our worker unit that is mining that is closest to it
-		BWAPI::Unit * workerDefender = WorkerManager::Instance().getClosestMineralWorkerTo(enemyWorker);
+		if (enemyWorker->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation())) > 32 * 10)
+		{
+			WorkerManager::Instance().finishedWithCombatWorkers();
+		}
+		else
+		{
+			// get our worker unit that is mining that is closest to it
+			BWAPI::Unit * workerDefender = WorkerManager::Instance().getClosestMineralWorkerTo(enemyWorker);
 
-		// grab it from the worker manager
-		WorkerManager::Instance().setCombatWorker(workerDefender);
-		//}
+			// grab it from the worker manager
+			WorkerManager::Instance().setCombatWorker(workerDefender);
+		}
 		/*
 		if (triggerZerglingBuilding)
 		{

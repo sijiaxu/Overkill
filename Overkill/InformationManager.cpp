@@ -7,7 +7,7 @@
 InformationManager::InformationManager()
 {
 
-	enemyInfluenceMap.resize(BWAPI::Broodwar->mapHeight(), std::vector<gridInfo>(BWAPI::Broodwar->mapWidth(), gridInfo()));
+	enemyInfluenceMap.resize(BWAPI::Broodwar->mapWidth(), std::vector<gridInfo>(BWAPI::Broodwar->mapHeight(), gridInfo()));
 
 	selfNaturalBaseLocation = BWAPI::TilePositions::None;
 	selfStartBaseLocation = BWAPI::Broodwar->self()->getStartLocation();
@@ -177,8 +177,18 @@ void InformationManager::checkVeryEarlyRush()
 {
 	if (BWAPI::Broodwar->getFrameCount() < 5000 && earlyRush)
 	{
-		std::set<BWTA::Region *> myOccupied = occupiedRegions[0];
-		myOccupied.insert(BWTA::getRegion(getOurNatrualLocation()));
+		bool hasEnemy = false;
+		BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
+		{
+			if (enemyUnit->getType().isWorker() || enemyUnit->getType() == BWAPI::UnitTypes::Zerg_Overlord)
+				continue;
+			//TODO: invisible unit can be get from api, bug
+			if (occupiedRegions[0].find(BWTA::getRegion(BWAPI::TilePosition(enemyUnit->getPosition()))) != occupiedRegions[0].end()
+				&& (enemyUnit->getType().canAttack() || enemyUnit->getType() == BWAPI::UnitTypes::Terran_Bunker))
+			{
+				hasEnemy = true;
+			}
+		}
 
 		BWAPI::TilePosition trueNatrual;
 		double closest = 999999999;
@@ -189,37 +199,21 @@ void InformationManager::checkVeryEarlyRush()
 			{
 				continue;
 			}
-			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest)
+			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest )
 			{
 				closest = base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation));
 				trueNatrual = base->getTilePosition();
 			}
 		}
-		myOccupied.insert(BWTA::getRegion(trueNatrual));
 
-		bool hasEnemy = false;
-		BWAPI::TilePosition enemyPosition = BWAPI::TilePositions::None;
-		BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
-		{
-			if (enemyUnit->getType().isWorker() || enemyUnit->getType() == BWAPI::UnitTypes::Zerg_Overlord)
-				continue;
-			//TODO: invisible unit can be get from api, bug
-			if (myOccupied.find(BWTA::getRegion(BWAPI::TilePosition(enemyUnit->getPosition()))) != myOccupied.end()
-				&& (enemyUnit->getType().canAttack() || enemyUnit->getType() == BWAPI::UnitTypes::Terran_Bunker))
-			{
-				hasEnemy = true;
-				enemyPosition = enemyUnit->getTilePosition();
-			}
-		}
-
-		if (hasEnemy) /*|| 
+		if (hasEnemy || 
 			(enemyAllBuilding.find(BWAPI::UnitTypes::Terran_Barracks) != enemyAllBuilding.end()
 			&& (BWTA::getRegion((*enemyAllBuilding[BWAPI::UnitTypes::Terran_Barracks].begin())->getPosition()) == BWTA::getRegion(selfNaturalBaseLocation)
-			|| BWTA::getRegion((*enemyAllBuilding[BWAPI::UnitTypes::Terran_Barracks].begin())->getPosition()) == BWTA::getRegion(trueNatrual))))*/
+			|| BWTA::getRegion((*enemyAllBuilding[BWAPI::UnitTypes::Terran_Barracks].begin())->getPosition()) == BWTA::getRegion(trueNatrual))))
 		{
 			BWAPI::Broodwar->printf("detect early rush");
 			earlyRush = false;
-			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, enemyPosition, 1);
+			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(BWTA::getNearestChokepoint(selfStartBaseLocation)->getCenter()), 1);
 		}
 	}
 }
@@ -388,19 +382,19 @@ void InformationManager::onUnitMorph(BWAPI::Unit * unit)
 void InformationManager::updateEnemyUnitInfluenceMap()
 {
 	//reset enemy unit's influence
-	for (int i = 0; i < BWAPI::Broodwar->mapHeight(); i++)
+	for (int i = 0; i < BWAPI::Broodwar->mapWidth(); i++)
 	{
-		for (int j = 0; j < BWAPI::Broodwar->mapWidth(); j++)
+		for (int j = 0; j < BWAPI::Broodwar->mapHeight(); j++)
 		{
 			enemyInfluenceMap[i][j].enemyUnitAirForce = 0;
 			enemyInfluenceMap[i][j].enemyUnitGroundForce = 0;
 			
 			if (int(enemyInfluenceMap[i][j].airForce) != 0 || int(enemyInfluenceMap[i][j].decayAirForce) != 0)
 			{
-				//if (int(enemyInfluenceMap[i][j].airForce) != 0)
-					//BWAPI::Broodwar->drawTextMap(j * 32, i * 32, "%d", int(enemyInfluenceMap[i][j].airForce));
-				//else
-					//BWAPI::Broodwar->drawTextMap(j * 32, i * 32, "%d", int(enemyInfluenceMap[i][j].decayAirForce));
+				if (int(enemyInfluenceMap[i][j].airForce) != 0)
+					BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].airForce));
+				else
+					BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].decayAirForce));
 			}
 		}
 	}
@@ -410,33 +404,52 @@ void InformationManager::updateEnemyUnitInfluenceMap()
 		if (!enemy->getType().isBuilding() && enemy->getType().canAttack() && !enemy->getType().isWorker())
 		{
 			int attackRange = 0;
+			int airDamage = 0;
+			int groundDamage = 0;
+			int buildingWidth = enemy->getType().tileWidth();
+			int buildingHeight = enemy->getType().tileHeight();
+			int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
+
 			if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-				attackRange = (enemy->getType().groundWeapon().maxRange() / 32) + 2;
-			else
-				attackRange = (enemy->getType().airWeapon().maxRange() / 32) + 2;
-
-			int y_start = enemy->getTilePosition().y() - attackRange > 0 ? enemy->getTilePosition().y() - attackRange : 0;
-			int y_end = enemy->getTilePosition().y() + attackRange > BWAPI::Broodwar->mapHeight() - 1 ? BWAPI::Broodwar->mapHeight() - 1 : enemy->getTilePosition().y() + attackRange;
-
-			int x_start = enemy->getTilePosition().x() - attackRange > 0 ? enemy->getTilePosition().x() - attackRange : 0;
-			int x_end = enemy->getTilePosition().x() + attackRange > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : enemy->getTilePosition().x() + attackRange;
-
-			for (int i = y_start; i <= y_end; i++)
 			{
-				for (int j = x_start; j <= x_end; j++)
+				attackRange = (enemy->getType().groundWeapon().maxRange() / 32) + maxSize + 1;
+				groundDamage = enemy->getType().groundWeapon().damageAmount();
+			}
+			if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
+			{
+				attackRange = (enemy->getType().airWeapon().maxRange() / 32) + maxSize + 1;
+				airDamage = enemy->getType().airWeapon().damageAmount();
+			}
+
+			double2 initPosition(enemy->getTilePosition().x() + buildingWidth / 2, enemy->getTilePosition().y() + buildingHeight / 2);
+			double2 normalLength = double2(1, 0);
+			std::set<BWAPI::TilePosition> alreadySetPosition;
+			int startDegree = 0;
+			while (startDegree < 360)
+			{
+				double2 rotateNormal(normalLength.rotateReturn(startDegree));
+				for (int length = 1; length <= attackRange; length++)
 				{
-					if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].enemyUnitGroundForce += enemy->getType().groundWeapon().damageAmount();
-					if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].enemyUnitAirForce += enemy->getType().airWeapon().damageAmount();
+					double2 rotateVector(rotateNormal * length + initPosition);
+					BWAPI::TilePosition tmp(int(rotateVector.x), int(rotateVector.y));
+					if (int(tmp.x()) >= 0 && int(tmp.x()) < BWAPI::Broodwar->mapWidth() && int(tmp.y()) >= 0 && int(tmp.y()) < BWAPI::Broodwar->mapHeight()
+						&& alreadySetPosition.find(tmp) == alreadySetPosition.end())
+					{
+						alreadySetPosition.insert(tmp);
+						if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
+							enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitGroundForce += groundDamage;
+						if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
+							enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitAirForce += airDamage;
+					}
 				}
+				startDegree += 5;
 			}
 		}
 	}
 	/*
-	for (int i = 0; i < BWAPI::Broodwar->mapHeight(); i++)
+	for (int i = 0; i < BWAPI::Broodwar->mapWidth(); i++)
 	{
-		for (int j = 0; j < BWAPI::Broodwar->mapWidth(); j++)
+		for (int j = 0; j < BWAPI::Broodwar->mapHeight(); j++)
 		{
 			if (enemyInfluenceMap[i][j].enemyUnitAirForce > 0)
 				BWAPI::Broodwar->drawTextMap(j * 32, i * 32, "%d", int(enemyInfluenceMap[i][j].enemyUnitGroundForce));
@@ -491,12 +504,13 @@ void InformationManager::addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestr
 		double2 initPosition(unit->getTilePosition().x() + buildingWidth / 2, unit->getTilePosition().y() + buildingHeight / 2);
 		double2 normalLength = double2(1, 0);
 		std::set<BWAPI::TilePosition> alreadySetPosition;
-		for (int length = 1; length <= attackRange; length++)
+		int startDegree = 0;
+		while (startDegree < 360)
 		{
-			int startDegree = 0;
-			while (startDegree < 360)
+			double2 rotateNormal(normalLength.rotateReturn(startDegree));
+			for (int length = 1; length <= attackRange; length++)
 			{
-				double2 rotateVector((normalLength * length).rotateReturn(startDegree) + initPosition);
+				double2 rotateVector(rotateNormal * length + initPosition);
 				BWAPI::TilePosition tmp(int(rotateVector.x), int(rotateVector.y));
 				if (int(tmp.x()) >= 0 && int(tmp.x()) < BWAPI::Broodwar->mapWidth() && int(tmp.y()) >= 0 && int(tmp.y()) < BWAPI::Broodwar->mapHeight()
 					&& alreadySetPosition.find(tmp) == alreadySetPosition.end())
@@ -504,115 +518,47 @@ void InformationManager::addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestr
 					alreadySetPosition.insert(tmp);
 					if (addOrdestroy)
 					{
-						enemyInfluenceMap[tmp.y()][tmp.x()].groundForce += groundDamage;
-						enemyInfluenceMap[tmp.y()][tmp.x()].airForce += airDamage;
+						enemyInfluenceMap[tmp.x()][tmp.y()].groundForce += groundDamage;
+						enemyInfluenceMap[tmp.x()][tmp.y()].airForce += airDamage;
 					}
 					else
 					{
-						enemyInfluenceMap[tmp.y()][tmp.x()].groundForce -= groundDamage;
-						enemyInfluenceMap[tmp.y()][tmp.x()].airForce -= airDamage;
+						enemyInfluenceMap[tmp.x()][tmp.y()].groundForce -= groundDamage;
+						enemyInfluenceMap[tmp.x()][tmp.y()].airForce -= airDamage;
 					}
-					/*
-					if (addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].groundForce += unit->getType().groundWeapon().damageAmount();
-
-					if (addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].airForce += unit->getType().airWeapon().damageAmount();
-
-					if (!addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].groundForce -= unit->getType().groundWeapon().damageAmount();
-					if (!addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].airForce -= unit->getType().airWeapon().damageAmount();*/
 				}
-				startDegree += 5;
 			}
+			startDegree += 5;
 		}
 		
 		int decayRange = 4;
-		for (int length = attackRange + 1; length <= attackRange + decayRange; length++)
+		startDegree = 0;
+		while (startDegree < 360)
 		{
-			int startDegree = 0;
-			while (startDegree < 360)
+			double2 rotateNormal(normalLength.rotateReturn(startDegree));
+			for (int length = attackRange + 1; length <= attackRange + decayRange; length++)
 			{
 				double decayValue = (decayRange - (length - attackRange)) / double(decayRange);
-				double2 rotateVector((normalLength * length).rotateReturn(startDegree) + initPosition);
+				double2 rotateVector(rotateNormal * length + initPosition);
 				BWAPI::TilePosition tmp(int(rotateVector.x), int(rotateVector.y));
 				if (int(tmp.x()) >= 0 && int(tmp.x()) < BWAPI::Broodwar->mapWidth() && int(tmp.y()) >= 0 && int(tmp.y()) < BWAPI::Broodwar->mapHeight()
 					&& alreadySetPosition.find(tmp) == alreadySetPosition.end())
 				{
 					alreadySetPosition.insert(tmp);
-					if (addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].decayGroundForce += decayValue;
-					if (addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].decayAirForce += decayValue;
-
-					if (!addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].decayGroundForce -= decayValue;
-					if (!addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[tmp.y()][tmp.x()].decayAirForce -= decayValue;
+					if (addOrdestroy)
+					{
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce += decayValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce += decayValue;
+					}
+					else
+					{
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce -= decayValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce -= decayValue;
+					}
 				}
-				startDegree += 5;
 			}
+			startDegree += 5;
 		}
-
-
-
-		/*
-		int buildingWidth = unit->getType().tileWidth();
-		int buildingHeight = unit->getType().tileHeight();
-		int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
-		int attackRange = 0;
-		if (unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-			attackRange = (unit->getType().groundWeapon().maxRange() / 32) + maxSize;
-		else
-			attackRange = (unit->getType().airWeapon().maxRange() / 32) + maxSize;
-
-		int decayRange = 5;
-		// get the approximate center of the building
-		BWAPI::TilePosition initPosition(unit->getTilePosition().x() + buildingWidth / 2, unit->getTilePosition().y() + buildingHeight / 2);
-
-		int y_start = initPosition.y() - attackRange - decayRange > 0 ? initPosition.y() - attackRange - decayRange : 0;
-		int y_end = initPosition.y() + attackRange + decayRange > BWAPI::Broodwar->mapHeight() - 1 ? BWAPI::Broodwar->mapHeight() - 1 : initPosition.y() + attackRange + decayRange;
-
-		int x_start = initPosition.x() - attackRange - decayRange > 0 ? initPosition.x() - attackRange - decayRange : 0;
-		int x_end = initPosition.x() + attackRange + decayRange > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : initPosition.x() + attackRange + decayRange;
-
-		for (int i = y_start; i <= y_end; i++)
-		{
-			for (int j = x_start; j <= x_end; j++)
-			{
-				int xDiff = std::abs(j - initPosition.x());
-				int yDiff = std::abs(i - initPosition.y());
-				int distance = std::max(xDiff, yDiff);
-
-				if (distance <= attackRange)
-				{
-					if (addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].groundForce += unit->getType().groundWeapon().damageAmount();
-
-					if (addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].airForce += unit->getType().airWeapon().damageAmount();
-
-					if (!addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].groundForce -= unit->getType().groundWeapon().damageAmount();
-					if (!addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].airForce -= unit->getType().airWeapon().damageAmount();
-				}
-				else
-				{
-					double decayValue = (decayRange - (distance - attackRange)) * 10 / double(decayRange) ;
-					if (addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].decayGroundForce += decayValue;
-					if (addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].decayAirForce += decayValue;
-
-					if (!addOrdestroy && unit->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].decayGroundForce -= decayValue;
-					if (!addOrdestroy && unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-						enemyInfluenceMap[i][j].decayAirForce -= decayValue;
-				}
-			}
-		}*/
 	}
 } 
 

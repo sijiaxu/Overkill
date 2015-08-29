@@ -4,9 +4,17 @@
 
 void HydraliskTactic::update()
 {
+
 	HydraliskArmy* hydralisks = dynamic_cast<HydraliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]);
 	MutaliskArmy* mutalisks = dynamic_cast<MutaliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]);
 	OverLordArmy* overlords = dynamic_cast<OverLordArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Overlord]);
+
+	if (hydralisks->getUnits().size() == 0 && mutalisks->getUnits().size() == 0 && overlords->getUnits().size() == 0)
+	{
+		state = END;
+		return;
+	}
+		
 
 	if ((*BWTA::getRegion(attackPosition)->getBaseLocations().begin())->isIsland())
 	{
@@ -15,6 +23,8 @@ void HydraliskTactic::update()
 	}
 
 	newArmyRally();
+
+	BWAPI::Broodwar->drawLineMap((*hydralisks->getUnits().begin()).unit->getPosition().x(), (*hydralisks->getUnits().begin()).unit->getPosition().y(), attackPosition.x(), attackPosition.y(), Colors::Green);
 
 	switch (state)
 	{
@@ -75,15 +85,11 @@ void HydraliskTactic::update()
 	case ATTACK:
 	{
 		if (hydralisks->getUnits().size() <= 2 && mutalisks->getUnits().size() == 0)
-		{
 			state = END;
-			return;
-		}
-			
+
 		if (!hasEnemy())
 		{
 			state = END;
-			return;
 		}
 
 		std::vector<hydrliskDistance> armyDistance;
@@ -158,14 +164,7 @@ void HydraliskTactic::update()
 bool HydraliskTactic::isTacticEnd()
 {
 	if (state == END)
-	{
-		OverLordArmy* overlords = dynamic_cast<OverLordArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Overlord]);
-		BOOST_FOREACH(UnitState u, overlords->getUnits())
-		{
-			u.unit->move(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
-		}
 		return true;
-	}
 	else
 		return false;
 }
@@ -179,5 +178,6 @@ HydraliskTactic::HydraliskTactic()
 
 void HydraliskTactic::generateAttackPath()
 {
+
 
 }

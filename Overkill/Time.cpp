@@ -63,12 +63,6 @@ public:
 	double getElapsedTimeInMicroSec()
 	{
 
-		//if (!stopped)
-		//{
-		//QueryPerformanceCounter(&endCount);
-		//}
-
-
 		startTimeInMicroSec = startCount.QuadPart * (1000000.0 / frequency.QuadPart);
 		endTimeInMicroSec = endCount.QuadPart * (1000000.0 / frequency.QuadPart);
 

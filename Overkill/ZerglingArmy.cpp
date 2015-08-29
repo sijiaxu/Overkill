@@ -49,7 +49,7 @@ void ZerglingArmy::harassAttack(BWAPI::Position targetPosition)
 		//get the target unit nearby and in target circle
 		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
 		{
-			if (u->getPlayer() == BWAPI::Broodwar->enemy() && influnceMap[u->getTilePosition().y()][u->getTilePosition().x()].groundForce == 0)
+			if (u->getPlayer() == BWAPI::Broodwar->enemy() && influnceMap[u->getTilePosition().x()][u->getTilePosition().y()].groundForce == 0)
 			{
 				//ignore cannon, kill worker first
 				int priority = harassAttackPriority(u);
@@ -66,8 +66,7 @@ void ZerglingArmy::harassAttack(BWAPI::Position targetPosition)
 		}
 
 		// do not attack building alone the way
-		if (closet != NULL && closet->getType().groundWeapon() != BWAPI::WeaponTypes::None && !closet->getType().isBuilding()
-			&& BWTA::getRegion(closet->getPosition()) == BWTA::getRegion(targetPosition))
+		if (closet != NULL && closet->getType().groundWeapon() != BWAPI::WeaponTypes::None && !closet->getType().isBuilding()) 
 			zerglingFSM(u, closet);
 		else if (closet != NULL && BWAPI::Broodwar->isVisible(BWAPI::TilePosition(targetPosition)))
 			zerglingFSM(u, closet);
@@ -169,7 +168,7 @@ void ZerglingArmy::defend(BWAPI::Position targetPosition)
 		{
 			//TODO:: add self influence map to justify our 
 			// if target is an can-attack unit with weapon force large than ours
-			int targetForce = int(influnceMap[closet->getTilePosition().y()][closet->getTilePosition().x()].enemyUnitGroundForce) + int(influnceMap[closet->getTilePosition().y()][closet->getTilePosition().x()].groundForce);
+			int targetForce = int(influnceMap[closet->getTilePosition().x()][closet->getTilePosition().y()].enemyUnitGroundForce) + int(influnceMap[closet->getTilePosition().x()][closet->getTilePosition().y()].groundForce);
 			if (int(units.size() * BWAPI::UnitTypes::Zerg_Zergling.groundWeapon().damageAmount() / 2) < targetForce &&
 				(closet->getType().canAttack() || closet->getType() == BWAPI::UnitTypes::Terran_Bunker) && 
 				!closet->getType().isWorker() && closet->getDistance(closeSunker->getPosition()) > BWAPI::UnitTypes::Zerg_Sunken_Colony.groundWeapon().maxRange())

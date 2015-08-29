@@ -178,7 +178,7 @@ void ScoutManager::overlordMove(Scout& overlord)
 			{
 				continue;
 			}
-			int nextAirForce = int(influnceMap[nextTilePosition.y()][nextTilePosition.x()].airForce) + int(influnceMap[nextTilePosition.y()][nextTilePosition.x()].decayAirForce);
+			int nextAirForce = int(influnceMap[nextTilePosition.x()][nextTilePosition.y()].airForce) + int(influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayAirForce);
 			if (nextAirForce < lowestAirForce || (nextAirForce == lowestAirForce && nextTilePosition.getDistance(overlord.TileTarget) < cloest))
 			{
 				nextMovePosition = nextTilePosition;

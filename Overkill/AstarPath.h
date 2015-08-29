@@ -2,66 +2,39 @@
 #include "Common.h"
 #include "InformationManager.h"
 #include "TimeManager.cpp"
+#include <unordered_map>
+#include <queue>
 
 
-struct wayPoint
+struct fValueGridPoint
 {
-	BWAPI::TilePosition wayPosition;
-	BWAPI::TilePosition targetPosition;
-	BWAPI::TilePosition parentPosition;
+	BWAPI::TilePosition position;
+	double fValue;
 
-	int cumulativeValue;
-	int heuristicValue;
-
-	wayPoint(BWAPI::TilePosition position, BWAPI::TilePosition target)
+	fValueGridPoint(BWAPI::TilePosition p, double f)
 	{
-		wayPosition = position;
-		targetPosition = target;
-		cumulativeValue = 0;
-		heuristicValue = int(wayPosition.getDistance(targetPosition));
+		position = p;
+		fValue = f;
 	}
 
-	wayPoint(BWAPI::TilePosition position)
+	bool operator < (const fValueGridPoint& g) const
 	{
-		wayPosition = position;
-	}
-
-	wayPoint(const wayPoint& p)
-	{
-		wayPosition = p.wayPosition;
-		targetPosition = p.targetPosition;
-		parentPosition = p.parentPosition;
-		cumulativeValue = p.cumulativeValue;
-		heuristicValue = p.heuristicValue;
-	}
-
-	void setParent(wayPoint& p)
-	{
-		cumulativeValue = p.cumulativeValue + int(wayPosition.getDistance(p.wayPosition));
-		parentPosition = p.wayPosition;
-	}
-
-	void checkParent(wayPoint& p)
-	{
-		int curCumulativeValue = p.cumulativeValue + int(wayPosition.getDistance(p.wayPosition));
-		if (curCumulativeValue < cumulativeValue)
-		{
-			cumulativeValue = curCumulativeValue;
-			parentPosition = p.wayPosition;
-		}
-	}
-
-	bool operator < (const wayPoint& u) const
-	{
-		if (wayPosition.y() < u.wayPosition.y())
+		if (fValue > g.fValue)
 			return true;
-		else if (wayPosition.y() > u.wayPosition.y())
-			return false;
 		else
-			if (wayPosition.x() < u.wayPosition.x())
-				return true;
-			else
-				return false;
+			return false;
+	}
+};
+
+struct costGridPoint
+{
+	BWAPI::TilePosition position;
+	double costValue;
+
+	costGridPoint(BWAPI::TilePosition p, double f)
+	{
+		position = p;
+		costValue = f;
 	}
 };
 

@@ -214,26 +214,6 @@ void MutaliskHarassTactic::update()
 			state = RETREAT;
 			return;
 		}
-		
-		/*
-		std::set<BWAPI::Unit*>& units = (*mutalisk->getUnits().begin()).unit->getUnitsInRadius(8 * 32);
-		bool hasArmy = false;
-		BOOST_FOREACH(BWAPI::Unit* u, units)
-		{
-			if (u->getPlayer() == BWAPI::Broodwar->enemy()
-				&& u->getType().airWeapon() != BWAPI::WeaponTypes::None)
-			{
-				hasArmy = true;
-				break;
-			}
-		}
-		// if attackPosition is not in cannon's range, attacking to the attackPosition first
-		if (!hasArmy && !BWAPI::Broodwar->isVisible(BWAPI::TilePosition(attackPosition))
-			&& imInfo[BWAPI::TilePosition(attackPosition).y()][BWAPI::TilePosition(attackPosition).x()].airForce == 0)
-		{
-			state = MOVEATTACK;
-			return;
-		}*/
 			
 		bool noTarget = mutalisk->harassAttack(attackPosition);
 		if (noTarget)
@@ -301,7 +281,7 @@ bool MutaliskHarassTactic::hasEnemy()
 				it->second.unitType == BWAPI::UnitTypes::Zerg_Spore_Colony ||
 				it->second.unitType == BWAPI::UnitTypes::Terran_Bunker)
 			{
-				if (imInfo[BWAPI::TilePosition(it->second.initPosition).y()][BWAPI::TilePosition(it->second.initPosition).x()].airForce / 20
+				if (imInfo[BWAPI::TilePosition(it->second.initPosition).x() + 1][BWAPI::TilePosition(it->second.initPosition).y() + 1].airForce / 20
 					<= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() / 4)
 				{
 					attackPosition = BWAPI::Position(it->second.initPosition);
@@ -316,29 +296,7 @@ bool MutaliskHarassTactic::hasEnemy()
 					attackPosition = BWAPI::Position(it->second.initPosition);
 					return true;
 				}
-				/*
-				int buildingWidth = it->second.unitType.tileWidth();
-				int buildingHeight = it->second.unitType.tileHeight();
-				double2 initPosition(it->second.initPosition.x() + buildingWidth / 2, it->second.initPosition.y() + buildingHeight / 2);
-				int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
-				double2 length = double2(1, 0) * (mutaliskAttackRange + maxSize);
-
-				int startDegree = 0;
-				while (startDegree < 360)
-				{
-					double2 rotateVector(length.rotateReturn(startDegree) + initPosition);
-					if (int(rotateVector.x) >= 0 && int(rotateVector.x) < BWAPI::Broodwar->mapWidth() && int(rotateVector.y) >= 0 && int(rotateVector.y) < BWAPI::Broodwar->mapHeight()
-						&& imInfo[int(rotateVector.y)][int(rotateVector.x)].airForce == 0)
-					{
-						attackPosition = BWAPI::Position(it->second.initPosition);
-						return true;
-					}
-					startDegree += 30;
-				}*/
 			}
-
-
-			
 		}
 	}
 	return false;
@@ -353,7 +311,7 @@ bool MutaliskHarassTactic::needRetreat()
 	bool retreat = false;
 	BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
 	{
-		if (imInfo[u.unit->getTilePosition().y()][u.unit->getTilePosition().x()].enemyUnitAirForce > 
+		if (imInfo[u.unit->getTilePosition().x()][u.unit->getTilePosition().y()].enemyUnitAirForce > 
 			tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * mutaliskAttackDamage)
 		{
 			retreat = true;

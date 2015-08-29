@@ -59,6 +59,11 @@ public:
 		timers[t].stop();
 	}
 
+	double getElapseTime(const TimerManager::Type t)
+	{
+		return timers[t].getElapsedTimeInMilliSec();
+	}
+
 	double getTotalElapsed()
 	{
 		return timers[0].getElapsedTimeInMilliSec();
@@ -76,7 +81,7 @@ public:
 		{
 			double elapsed = timers[i].getElapsedTimeInMilliSec();
 
-			if (elapsed > maxTimeConsume )//&& timerNames[i] != "Total")
+			if (elapsed > maxTimeConsume && timerNames[i] != "Total")
 			{
 				maxTimeConsume = elapsed;
 				maxTimerName = timerNames[i];

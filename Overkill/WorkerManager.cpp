@@ -101,7 +101,7 @@ void WorkerManager::updateWorkerStatus()
 void WorkerManager::handleGasWorkers()
 {
 	//if in the middle game stage, we have worker less than 10(means most worker have been killed), mine first
-	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 8000)
+	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 5000)
 	{
 		BOOST_FOREACH(BWAPI::Unit * unit, workerData.getWorkers())
 		{
