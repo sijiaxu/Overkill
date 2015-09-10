@@ -10,4 +10,5 @@ CIG 2015: 3rd
 
 ###Bot video
 https://www.youtube.com/watch?v=80TD_jb7lX4
+
 from 27:47 and from 35:27
