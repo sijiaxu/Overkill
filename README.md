@@ -3,7 +3,8 @@
 
 Author: sijia xu(xsj.guagua@gmail.com)
 
-Please check out the [Wiki](https://github.com/sijiaxu/Overkill/wiki) for detail informations.
+Overkill is a zerg bot which can select adaptive opening strategy based on previous match results.
+besides, it now has three zerg tactics: zergling rush, mutalisk rush and hydralisk rush. it also can make change among these tactics according to game's current situation.
 
 ###Competition Results
 CIG 2015: 3rd
