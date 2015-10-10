@@ -20,6 +20,19 @@ void BuildOrderQueue::clearAll()
 	lowestPriority = 0;
 }
 
+void BuildOrderQueue::clearAllUnit()
+{
+	for (std::deque< BuildOrderItem<PRIORITY_TYPE>>::iterator it = queue.begin(); it != queue.end();)
+	{
+		if (it->metaType.isBuilding() || it->metaType.unitType == BWAPI::UnitTypes::Zerg_Drone)
+		{
+			it++;
+		}
+		else
+			it = queue.erase(it);
+	}
+}
+
 BuildOrderItem<PRIORITY_TYPE> & BuildOrderQueue::getHighestPriorityItem()
 {
 	// reset the number of skipped items to zero

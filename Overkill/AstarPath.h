@@ -40,3 +40,6 @@ struct costGridPoint
 
 
 std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition, bool isFlyer, bool nearEndPosition = false);
+
+std::list<BWAPI::TilePosition> aStarGroundPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition);
+

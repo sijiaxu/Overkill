@@ -17,8 +17,10 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
 			newAntiAirAnmyCount++;
 		}
 
-		if ((newCannonCount == 3 || newAntiAirAnmyCount == 5) && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() > 0)
+		if (BWAPI::Broodwar->getFrameCount() > triggerChangeTime && (newCannonCount >= 3 || newAntiAirAnmyCount >= 5) && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() > 0)
 		{
+			triggerChangeTime = BWAPI::Broodwar->getFrameCount() + 25 * 4;
+
 			if (state == MOVE || state == BACKMOVE)
 			{
 				state = LOCATIONASSIGN;
@@ -27,7 +29,7 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
 			for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 			{
 				it->second.clear();
-				std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(unit->getTilePosition(), BWAPI::TilePosition(attackPosition), true, false);
+				std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(it->first->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
 				std::vector<BWAPI::Position> movePath;
 				movePath.reserve(pathFind.size());
 				BOOST_FOREACH(BWAPI::TilePosition p, pathFind)
@@ -45,7 +47,7 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
 
 void MutaliskHarassTactic::addArmyUnit(BWAPI::Unit* unit)
 {
-	std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(unit->getTilePosition(), BWAPI::TilePosition(attackPosition), true, false);
+	std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(unit->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
 	std::vector<BWAPI::Position> movePath;
 	movePath.reserve(pathFind.size());
 	BOOST_FOREACH(BWAPI::TilePosition p, pathFind)
@@ -82,6 +84,7 @@ void MutaliskHarassTactic::locationAssign(MutaliskArmy* mutalisk, BWAPI::Positio
 
 void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState nextState)
 {
+
 	if (moveComplete.size() > 0)
 	{
 		std::set<BWAPI::Unit*> nearbyUnits = (*moveComplete.begin())->getUnitsInRadius(12 * 32);
@@ -95,7 +98,7 @@ void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState next
 		}
 	}
 	
-	if (unitMovePath.size() / double(mutalisk->getUnits().size()) <= 0.2)
+	if (unitMovePath.size() / double(mutalisk->getUnits().size()) <= 0.1)
 	{
 		state = nextState;
 		return;
@@ -147,8 +150,44 @@ void MutaliskHarassTactic::update()
 
 	newArmyRally();
 
+	if (BWAPI::Broodwar->getFrameCount() % 100 == 0)
+	{
+		for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+		{
+			it->second.clear();
+			std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(it->first->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
+			std::vector<BWAPI::Position> movePath;
+			movePath.reserve(pathFind.size());
+			BOOST_FOREACH(BWAPI::TilePosition p, pathFind)
+			{
+				movePath.push_back(BWAPI::Position(p));
+			}
+			it->second = movePath;
+		}
+	}
+
 	MutaliskArmy* mutalisk = dynamic_cast<MutaliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]);
 	std::vector<std::vector<gridInfo>>& imInfo = InformationManager::Instance().getEnemyInfluenceMap();
+
+	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& regionDetail = InformationManager::Instance().getEnemyOccupiedDetail();
+	int antiairBuildingCount = 0;
+	if (regionDetail.find(BWTA::getRegion(attackPosition)) != regionDetail.end())
+	{
+		std::map<BWAPI::Unit*, buildingInfo> buildinginfo = regionDetail[BWTA::getRegion(attackPosition)];
+		for (std::map<BWAPI::Unit*, buildingInfo>::iterator it = buildinginfo.begin(); it != buildinginfo.end(); it++)
+		{
+			if (it->second.unitType.isBuilding() && (it->second.unitType.airWeapon() != BWAPI::WeaponTypes::None || it->second.unitType == BWAPI::UnitTypes::Terran_Bunker))
+			{
+				antiairBuildingCount++;
+			}
+		}
+	}
+
+	int ourSupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired());
+	if (ourSupply < antiairBuildingCount * 12)
+	{
+		state = END;
+	}
 
 	TimerManager::Instance().startTimer(TimerManager::MutaliskTac);
 
@@ -158,7 +197,7 @@ void MutaliskHarassTactic::update()
 	case LOCATIONASSIGN:
 	{
 		attackPosition = originAttackBase;
-		locationAssign(mutalisk, originAttackBase, MOVE, false);
+		locationAssign(mutalisk, originAttackBase, MOVE, true);
 		break;
 	}
 	case MOVE:
@@ -177,27 +216,7 @@ void MutaliskHarassTactic::update()
 		locationMove(mutalisk, LOCATIONASSIGN);
 		break;
 	}
-	//only trigger when encounter large enemy outside the attack region
-	//move to origin attack position
-	case MOVEATTACK:
-	{
-		//mutalisk->armyMove(attackPosition);
-		//if ((*mutalisk->getUnits().begin()).unit->getDistance(attackPosition) < 10 * 32)
-			//state = ATTACK;
-		bool isAllReach = true;
-		BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-		{
-			if (u.unit->isMoving())
-			{
-				isAllReach = false;
-				break;
-			}
-		}
 
-		if (isAllReach)
-			state = ATTACK;
-		break;
-	}
 	case ATTACK:
 	{	
 		TimerManager::Instance().startTimer(TimerManager::MutaliskRetreat);
@@ -207,6 +226,15 @@ void MutaliskHarassTactic::update()
 		if (retreatFlag != 0)
 		{
 			TimerManager::Instance().startTimer(TimerManager::MutaAttack);
+			
+			bool noTarget = mutalisk->harassAttack(attackPosition, 1);
+			if (noTarget)
+			{
+				if (!hasEnemy())
+					state = END;
+			}
+
+			/*
 			if (retreatFlag == 1 && !BWAPI::Broodwar->isVisible(BWAPI::TilePosition(attackPosition)))
 			{
 				//only attack has-air-weapon enemy
@@ -220,7 +248,7 @@ void MutaliskHarassTactic::update()
 					if (!hasEnemy())
 						state = END;
 				}
-			}
+			}*/
 			TimerManager::Instance().stopTimer(TimerManager::MutaAttack);
 		}
 		break;
@@ -240,13 +268,13 @@ bool MutaliskHarassTactic::hasEnemy()
 	bool needAttack = false;
 	BOOST_FOREACH(BWAPI::Unit* u, units)
 	{
-		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition))
+		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition) && u->getType() != BWAPI::UnitTypes::Protoss_Observer)
 		{
 			return true;
 		}
 	}
 
-	if (needAttack ==false)
+	if (needAttack == false)
 	{
 		std::vector<std::vector<gridInfo>>& imInfo = InformationManager::Instance().getEnemyInfluenceMap();
 		std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& occupiedDetail = InformationManager::Instance().getEnemyOccupiedDetail();
@@ -276,70 +304,26 @@ bool MutaliskHarassTactic::hasEnemy()
 			}
 		}
 	}
-	
 	return false;
 }
 
 
-//only retreat when facing large number of enemy army, not cannons
+
 int MutaliskHarassTactic::needRetreat()
 {
 	bool retreat = false;
 	std::set<BWAPI::Unit*> nearbyUnits;
+	int mutaliskCount = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size();
+	BWAPI::Unit* firstUnit = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit;
 
-	std::vector<unitDistance> armyDistance;
-	BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-	{
-		armyDistance.push_back(unitDistance(u.unit, u.unit->getDistance(attackPosition)));
-	}
-	std::sort(armyDistance.begin(), armyDistance.end());
-	BWAPI::Unit* firstUnit = armyDistance.front().unit;
+	int ourSupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired());
 	
 	//enemy unit is picked in the same range
-	//std::set<BWAPI::Unit*> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 12 * 32);
 	nearbyUnits = firstUnit->getUnitsInRadius(12 * 32);
-	//nearbyUnits.insert(enemySetInCircle.begin(), enemySetInCircle.end());
-
-
-	/*
-	BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-	{
-		std::set<BWAPI::Unit*> tmp = u.unit->getUnitsInRadius(8 * 32);
-		nearbyUnits.insert(tmp.begin(), tmp.end());
-	}*/
-
-	/*
-	BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-	{
-		std::set<BWAPI::Unit*> tmp = u.unit->getUnitsInRadius(cannonRange);
-
-		// if enemy can attack us, add in nearby enemies count
-		// do not loop through all self unit, it may cause unwanted retreat sometime.
-		BOOST_FOREACH(BWAPI::Unit* unit, tmp)
-		{
-			if (unit->getPlayer() == BWAPI::Broodwar->enemy())
-			{
-				if (unit->getType().airWeapon() != BWAPI::WeaponTypes::None)
-				{
-					int attackRange = unit->getType().airWeapon().maxRange();
-					if (unit->getDistance(firstUnit) < attackRange) //|| (unit->getType().isBuilding() && unit->getDistance(u.unit) < attackRange * 1.5))
-					{
-						nearbyUnits.insert(unit);
-					}
-				}
-				else if (unit->getType() == BWAPI::UnitTypes::Terran_Bunker)
-				{
-					int attackRange = BWAPI::UnitTypes::Terran_Marine.airWeapon().maxRange() + 2;
-					if (unit->getDistance(firstUnit) < attackRange)
-					{
-						nearbyUnits.insert(unit);
-					}
-				}
-				else
-					continue;
-			}
-		}
-	}*/
+	std::set<BWAPI::Unit*> middleUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits()[mutaliskCount / 2].unit->getUnitsInRadius(12 * 32);
+	nearbyUnits.insert(middleUnitnearby.begin(), middleUnitnearby.end());
+	std::set<BWAPI::Unit*> backUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().back().unit->getUnitsInRadius(12 * 32);
+	nearbyUnits.insert(backUnitnearby.begin(), backUnitnearby.end());
 
 
 	//std::vector<std::vector<gridInfo>>& enemyIm = InformationManager::Instance().getEnemyInfluenceMap();
@@ -356,13 +340,13 @@ int MutaliskHarassTactic::needRetreat()
 				{
 					if (u->getType() == BWAPI::UnitTypes::Terran_Bunker)
 					{
-						inRegionEnemySupply += 16;
-						cannonSupply += 16;
+						inRegionEnemySupply += 12;
+						cannonSupply += 12;
 					}
 					else
 					{
-						inRegionEnemySupply += 12;
-						cannonSupply += 12;
+						inRegionEnemySupply += 8;
+						cannonSupply += 8;
 					}
 				}
 				else
@@ -376,13 +360,13 @@ int MutaliskHarassTactic::needRetreat()
 				{
 					if (u->getType() == BWAPI::UnitTypes::Terran_Bunker)
 					{
-						outRegionEnemySupply += 16;
-						cannonSupply += 16;
+						outRegionEnemySupply += 12;
+						cannonSupply += 12;
 					}
 					else
 					{
-						outRegionEnemySupply += 12;
-						cannonSupply += 12;
+						outRegionEnemySupply += 8;
+						cannonSupply += 8;
 					}
 				}
 				else
@@ -403,44 +387,12 @@ int MutaliskHarassTactic::needRetreat()
 	}
 	 
 	int enemySupply = inRegionEnemySupply + outRegionEnemySupply;
-	
-	//if battle happen outside region, or army is encounter cannon and far away from attack position
-	//go back to origin position
-	if (int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.8) < outRegionEnemySupply )
-		//|| (firstUnit->getDistance(attackPosition) >= 12 * 32 && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.5 < enemySupply))
-	{
-		state = MOVEATTACK;
-		attackPosition = originAttackBase;
-		
-		BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-		{
-			u.unit->move(attackPosition);
-			u.unit->stop(true);
-		}
-		return 0;
-	}
-	/*
-	//if enemies are almost cannon, try to find other attack position
-	if (tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.5 < enemySupply &&
-		cannonSupply / double(enemySupply) >= 0.8)
-	{
-		if (hasEnemy())
-		{
-			state = MOVEATTACK;
-			BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits())
-			{
-				u.unit->move(attackPosition);
-				u.unit->stop(true);
-			}
-			return 0;
-		}
-	}*/
 
 	//if has new army and 
 	// our army less than enemy  and our army are not severely damaged
 	//regroup at the middle position
 	if (newAddArmy.size() > 0 &&
-		(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.8 < enemySupply 
+		(int(ourSupply * 0.7) < enemySupply
 		|| lowHealthCount >= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * 0.7))
 	{
 		double2 distance((*tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().begin()).unit->getPosition() - (*newAddArmy.begin()).first->getPosition());
@@ -451,7 +403,7 @@ int MutaliskHarassTactic::needRetreat()
 		state = BACKLOCATIONASSIGN;
 		return 0;
 	}
-	else if (int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.8) < enemySupply
+	else if (int(ourSupply * 0.7) < enemySupply
 		|| (lowHealthCount >= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * 0.7 && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired() * 0.3 <= enemySupply))
 	{
 		state = END;
@@ -459,7 +411,6 @@ int MutaliskHarassTactic::needRetreat()
 	}
 	else
 		return 1;
-
 }
 
 
@@ -478,6 +429,7 @@ MutaliskHarassTactic::MutaliskHarassTactic()
 	newCannonCount = 0;
 	newAntiAirAnmyCount = 0;
 	groupPosition = BWAPI::Positions::None;
+	triggerChangeTime = 0;
 }
 
 void MutaliskHarassTactic::setAttackPosition(BWAPI::Position targetPosition)

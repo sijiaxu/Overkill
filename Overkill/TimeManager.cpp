@@ -25,11 +25,12 @@ class TimerManager
 
 	int barWidth;
 	double maxTimeConsume;
+	int maxFrameCount;
 	std::string maxTimerName;
 
 public:
 
-	enum Type { All, Worker, Production, Building, Attack, Scout, Information, tactic, strategy, Astar1, NumTypes };
+	enum Type { All, Worker, Production, Building, Attack, Scout, Information, tactic, strategy, Astar1, MutaliskTac, ZerglingTac, MutaliskRetreat, MutaAttack, NumTypes };
 
 	TimerManager() : timers(std::vector<Timer>(NumTypes)), barWidth(40)
 	{
@@ -43,8 +44,13 @@ public:
 		timerNames.push_back("tactic");
 		timerNames.push_back("strategy");
 		timerNames.push_back("Astar1");
+		timerNames.push_back("MutaliskTac");
+		timerNames.push_back("ZerglingTac");
+		timerNames.push_back("MutaliskRetreat");
+		timerNames.push_back("MutaAttack");
 		maxTimeConsume = 0;
 		maxTimerName = "";
+		maxFrameCount = 0;
 	}
 
 	~TimerManager() {}
@@ -72,7 +78,8 @@ public:
 	void displayTimers(int x, int y)
 	{
 		BWAPI::Broodwar->drawBoxScreen(x - 5, y - 5, x + 110 + barWidth, y + 5 + (10 * timers.size()), BWAPI::Colors::Black, true);
-		BWAPI::Broodwar->drawTextScreen(x - 30, y - 50, "max frame time is : %.4f", maxTimeConsume);
+		BWAPI::Broodwar->drawTextScreen(x - 30, y - 70, "max frame time is : %.4f", maxTimeConsume);
+		BWAPI::Broodwar->drawTextScreen(x - 30, y - 50, ">= 55ms count : %d", maxFrameCount);
 		BWAPI::Broodwar->drawTextScreen(x - 30, y - 30, "             from : %s", maxTimerName.c_str());
 
 		int yskip = 0;
@@ -81,10 +88,15 @@ public:
 		{
 			double elapsed = timers[i].getElapsedTimeInMilliSec();
 
-			if (elapsed > maxTimeConsume && timerNames[i] != "Total")
+			if (elapsed > maxTimeConsume) //&& timerNames[i] != "Total")
 			{
 				maxTimeConsume = elapsed;
 				maxTimerName = timerNames[i];
+			}
+
+			if (timerNames[i] == "Total" && elapsed >= 55)
+			{
+				maxFrameCount += 1;
 			}
 
 			int width = (int)((elapsed == 0) ? 0 : (barWidth * (elapsed / total)));

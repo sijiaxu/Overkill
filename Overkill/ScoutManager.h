@@ -19,15 +19,38 @@ struct Scout{
 	BWAPI::TilePosition naturalTileTarget;
 };
 
+
+struct scoutTarget
+{
+	BWAPI::TilePosition location;
+	int					priority;
+
+	scoutTarget(BWAPI::TilePosition t, int p)
+	{
+		location = t;
+		priority = p;
+	}
+
+	bool operator < (const scoutTarget & u)
+	{
+		if (priority < u.priority)
+			return true;
+		else
+			return false;
+	}
+
+};
+
 class ScoutManager {
 
 	enum ScoutState {scoutForEnemyBase = 0, scoutForEnemyInfo = 1};
 	ScoutState state;
 	std::vector<Scout> overLordIdle;
 	std::vector<Scout> overLordScouts;
+
 	ScoutManager();
 
-	std::vector<BWAPI::TilePosition>   scoutLocation;
+	std::vector<scoutTarget>   scoutLocation;
 
 	void						smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const;
 	void						assignScoutWork();
@@ -53,6 +76,6 @@ public:
 	void						giveBackOverLordArmy(BattleArmy* army);
 
 
-	std::vector<BWAPI::TilePosition>& getPossibleEnemyBase();
+	std::vector<scoutTarget>&	getPossibleEnemyBase();
 
 };

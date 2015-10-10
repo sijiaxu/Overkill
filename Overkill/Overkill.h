@@ -43,7 +43,12 @@ using namespace std;
 
 class Overkill : public BWAPI::AIModule
 {
-
+	void			readHistoryFile();
+	void			writeCurrentPlay(bool isWin);
+	
+	openingStrategy						chooseOpeningStrategy;
+	std::vector<std::vector<string>>	historyInfo;
+	
 
 public:
 

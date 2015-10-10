@@ -12,6 +12,8 @@ WorkerManager::WorkerManager()
 void WorkerManager::update()
 {
 
+	handleWorkerReact();
+
 	handleScoutWorker();
 
 	// worker bookkeeping
@@ -36,10 +38,54 @@ void WorkerManager::update()
 }
 
 
+void WorkerManager::handleWorkerReact()
+{
+	if (BWAPI::Broodwar->getFrameCount() > 12000)
+		return;
+
+	int droneAttackRange = BWAPI::UnitTypes::Zerg_Drone.groundWeapon().maxRange();
+	BOOST_FOREACH(BWAPI::Unit * worker, workerData.getWorkers())
+	{
+		if (workerData.getWorkerJob(worker) == WorkerData::Gas || workerData.getWorkerJob(worker) == WorkerData::Minerals)
+		{
+			std::set<BWAPI::Unit*> unitsNearby = worker->getUnitsInRadius(droneAttackRange * 3);
+
+			int closeDistance = 99999;
+			BWAPI::Unit* close = NULL;
+			BOOST_FOREACH(BWAPI::Unit* enemy, unitsNearby)
+			{
+				if (enemy->getPlayer() == BWAPI::Broodwar->enemy() && !enemy->getType().isFlyer() 
+					&& enemy->getType().canAttack() && enemy->isAttacking() && worker->getDistance(enemy->getPosition()) < closeDistance)
+				{
+					closeDistance = worker->getDistance(enemy->getPosition());
+					close = enemy;
+				}
+			}
+
+			if (close != NULL)
+			{
+				smartAttackUnit(worker, close);
+			}
+			else
+			{
+				if (!worker->isGatheringMinerals() && !worker->isGatheringGas())
+				{
+					if (workerData.getWorkerJob(worker) == WorkerData::Minerals)
+						worker->rightClick(workerData.getMineralWorkerMine(worker));
+					else
+						worker->rightClick(workerData.getGasWorkerRefinery(worker));
+				}
+			}
+		}
+	}
+}
+
+
+
 void WorkerManager::handleScoutWorker()
 {
 	//send the 10th worker to scout if we have not find the enemy base
-	if (workerData.getWorkers().size() == 10 && InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None &&
+	if (workerData.getWorkers().size() == 9 && InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None &&
 		ScoutManager::Instance().getPossibleEnemyBase().size() > 0 && !assignScout)
 	{
 		BOOST_FOREACH(BWAPI::Unit * worker, workerData.getWorkers())
@@ -101,19 +147,15 @@ void WorkerManager::updateWorkerStatus()
 void WorkerManager::handleGasWorkers()
 {
 	//if in the middle game stage, we have worker less than 10(means most worker have been killed), mine first
-	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 5000)
+	if (workerData.getNumWorkers() <= 10 && ProductionManager::Instance().getTopProductionNeed() && BWAPI::Broodwar->getFrameCount() > 5000)
 	{
 		BOOST_FOREACH(BWAPI::Unit * unit, workerData.getWorkers())
 		{
 			if (workerData.getWorkerJob(unit) == WorkerData::Gas)
 			{
-				if (workerData.getWorkingRefineryCount(unit) > 1)
-				{
-					setMineralWorker(unit);
-				}
+				setMineralWorker(unit);
 			}
 		}
-
 		return;
 	}
 
@@ -290,6 +332,7 @@ void WorkerManager::setMineralWorker(BWAPI::Unit * unit)
 			// update workerData with the new job
 			workerData.setWorkerJob(unit, WorkerData::Minerals, depot);
 	}
+	/*
 	else
 	{
 		if (BWAPI::Broodwar->getFrameCount() > depotTriggerTime)
@@ -298,7 +341,7 @@ void WorkerManager::setMineralWorker(BWAPI::Unit * unit)
 			depotTriggerTime = BWAPI::Broodwar->getFrameCount() + 60 * 30;
 		}
 		//BWAPI::Broodwar->printf("No valid depot for mineral worker");
-	}
+	}*/
 }
 
 BWAPI::Unit * WorkerManager::getClosestDepot(BWAPI::Unit * worker)
@@ -405,13 +448,29 @@ BWAPI::Unit * WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 		}
 	}
 
+	BWAPI::Unit * chosenWorker = NULL;
+	if (closestMovingWorker != NULL)
+	{
+		if (closestMiningWorker != NULL)
+			chosenWorker = closestMiningWorkerDistance < closestMovingWorkerDistance ? closestMiningWorker : closestMovingWorker;
+		else
+			chosenWorker = closestMovingWorker;
+	}
+	else
+	{
+		if (closestMiningWorker != NULL)
+			chosenWorker = closestMiningWorker;
+	}
+		
+
 	// if we found a moving worker, use it, otherwise using a mining worker
-	BWAPI::Unit * chosenWorker = closestMovingWorker ? closestMovingWorker : closestMiningWorker;
+	//BWAPI::Unit * chosenWorker = closestMovingWorker ? closestMovingWorker : closestMiningWorker;
 
 	// if the worker exists (one may not have been found in rare cases)
 	if (chosenWorker && setJobAsBuilder)
 	{
-		workerData.setWorkerJob(chosenWorker, WorkerData::Build, b.type);
+		//workerData.setWorkerJob(chosenWorker, WorkerData::Build, b.type);
+		workerData.setWorkerJob(chosenWorker, WorkerData::Build, NULL);
 	}
 
 	// return the worker
@@ -483,6 +542,7 @@ void WorkerManager::setMoveWorker(int mineralsNeeded, int gasNeeded, BWAPI::Posi
 	{
 		//BWAPI::Broodwar->printf("Setting worker job Move for worker %d", closestWorker->getID());
 		workerData.setWorkerJob(closestWorker, WorkerData::Move, WorkerMoveData(mineralsNeeded, gasNeeded, p));
+		//workerData.setWorkerJob(closestWorker, WorkerData::Move, NULL);
 	}
 	else
 	{
@@ -504,7 +564,7 @@ bool WorkerManager::willHaveResources(int mineralsRequired, int gasRequired, dou
 
 	// how many frames it will take us to move to the building location
 	// add a second to account for worker getting stuck. better early than late
-	double framesToMove = (distance / speed) + 50;
+	double framesToMove = (distance / speed) + 100;
 
 	// magic numbers to predict income rates
 	double mineralRate = getNumMineralWorkers() * 0.045;
@@ -549,7 +609,7 @@ void WorkerManager::onUnitMorph(BWAPI::Unit * unit)
 	{
 		BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
 		{
-			if (base->getTilePosition().getDistance(unit->getTilePosition()) < 5)
+			if (base->getTilePosition().getDistance(unit->getTilePosition()) < 3)
 			{
 				workerData.addDepot(unit);
 				break;

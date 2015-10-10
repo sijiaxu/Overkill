@@ -136,7 +136,7 @@ void WorkerData::setWorkerJob(BWAPI::Unit * unit, enum WorkerJob job, BWAPI::Uni
 		// start repairing 
 		unit->repair(jobUnit);
 	}
-	else if (job == Scout)
+	else if (job == Combat)
 	{
 
 	}
@@ -280,7 +280,7 @@ bool WorkerData::depotIsFull(BWAPI::Unit * depot)
 	int mineralsNearDepot = getMineralsNearDepot(depot);
 
 	//one mineral have three worker is maximum
-	if (assignedWorkers >= mineralsNearDepot * 3)
+	if (assignedWorkers >= int(mineralsNearDepot * 2.5))
 	{
 		return true;
 	}
@@ -328,7 +328,7 @@ int WorkerData::getMineralsNearDepot(BWAPI::Unit * depot)
 
 	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getAllUnits())
 	{
-		if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field) && unit->getDistance(depot) < 200)
+		if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field) && unit->getResources() > 0 && unit->getDistance(depot) < 200)
 		{
 			mineralsNearDepot++;
 		}

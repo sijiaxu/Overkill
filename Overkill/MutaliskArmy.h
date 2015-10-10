@@ -14,7 +14,7 @@ public:
 	void defend(BWAPI::Position targetPosition);
 	void attack(BWAPI::Position priorityPosition);
 
-	bool harassAttack(BWAPI::Position priorityPosition);
+	bool harassAttack(BWAPI::Position priorityPosition, int attackMode);
 	int harassAttackPriority(BWAPI::Unit * unit);
 
 	void mixArmyAttack(BWAPI::Position priorityPosition);

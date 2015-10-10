@@ -10,6 +10,24 @@ void BattleArmy::addUnit(BWAPI::Unit* u)
 }
 
 
+bool BattleArmy::isInDanger(BWAPI::Unit* u)
+{
+	if (!u->isUnderAttack())
+	{
+		return false;
+	}
+
+	std::set<BWAPI::Unit*>& enemyUnits = u->getUnitsInRadius(u->getType().sightRange());
+	BOOST_FOREACH(BWAPI::Unit* unit, enemyUnits)
+	{
+		if (unit->getPlayer() == BWAPI::Broodwar->enemy() &&
+			!unit->getType().isBuilding())
+		{
+			return true;
+		}
+	}
+	return false;
+}
 
 void BattleArmy::smartAttackUnit(BWAPI::Unit * attacker, BWAPI::Unit * target) const
 {
@@ -116,15 +134,15 @@ bool BattleArmy::reGroup(const BWAPI::Position & regroupPosition)
 	BOOST_FOREACH(UnitState u, units)
 	{
 		// if the unit is outside the regroup area
-		if (u.unit->getDistance(regroupPosition) < 32 * 10)
+		if (u.unit->getDistance(regroupPosition) < 32 * 8)
 		{
 			count++;
 		}
 	}
 
-	this->attack(regroupPosition);
+	this->armyMove(regroupPosition);
 
-	if (units.size() > 0 && count * 10 / units.size() > 7)
+	if (units.size() > 0 && count * 10 / units.size() >= 8)
 		return true;
 	else
 		return false;
@@ -140,13 +158,13 @@ bool BattleArmy::preciseReGroup(const BWAPI::Position & regroupPosition)
 		// if the unit is outside the regroup area
 		if (u.unit->getDistance(regroupPosition) > 32 * 5)
 		{
-			smartMove(u.unit, regroupPosition);
+			smartAttackMove(u.unit, regroupPosition);
 			isregroup = false;
 			//smartAttackMove(u.unit, regroupPosition);
 		}
 		else
 		{
-			smartMove(u.unit, regroupPosition);
+			smartAttackMove(u.unit, regroupPosition);
 		}
 	}
 

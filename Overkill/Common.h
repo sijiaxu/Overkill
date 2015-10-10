@@ -42,7 +42,7 @@ typedef std::vector<BWAPI::Unit*> UnitVector;
 
 BWAPI::AIModule * __NewAIModule();
 
-
+enum tacticType { ZerglingHarassTac = 0, MutaliskHarassTac = 1, HydraliskPushTactic = 2, DefendTactic = 3, tactictypeEnd};
 
 struct double2
 {

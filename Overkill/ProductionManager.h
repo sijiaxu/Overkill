@@ -47,6 +47,7 @@ class ProductionManager
 	ProductionState				productionState;
 
 	int							HatcheryProductionCheckTime;
+	int							extractorProductionCheckTime;
 
 //	BuildLearner				buildLearner;
 	bool						initialBuildSet;
@@ -93,8 +94,27 @@ class ProductionManager
 	BWAPI::TilePosition			getNextColonyLocation();
 
 	void						onHatcheryProduction();
+	void						onExtractorProduction();
 	void						onDroneProduction();
 	void						onGoalProduction();
+
+	bool						lairTrigger;
+	bool						spireTrigger;
+	bool						thirdBaseTrigger;
+	bool						secondExtractorTrigger;
+	bool						firstMutaTrigger;
+	bool						sunkenBuilderTrigger;
+	bool						sunkenWorkerTrigger;
+	bool						sunkenCanBuild;
+	int							sunkenBuilderTime;
+
+	int							zerglingsKilledCount;
+
+	void						buildExtractorTrick();
+
+
+	int							droneProductionSpeed;
+	int							extractorBuildSpeed;
 
 public:
 
@@ -110,15 +130,20 @@ public:
 	void						drawProductionInformation(int x, int y);
 
 	bool						isStrategyComplete();
+	int							getTopProductionNeed();
+	std::vector<BWAPI::UnitType>	getWaitingProudctUnit();
 
 	void						RushDefend(BWAPI::UnitType defendBuilding, int buildingCount, BWAPI::UnitType defendUnit, int unitCount);
 	void						defendLostRecover();
 	void						clearDefendVector();
 
 	void						triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count);
-	void						triggerUnit(BWAPI::UnitType unitType, int unitCount);
+	void						triggerUnit(BWAPI::UnitType unitType, int unitCount, bool isHighPriority = true, bool isBlocking = false);
 	void						triggerUpgrade(BWAPI::UpgradeType upgrade) { queue.queueAsHighestPriority(MetaType(upgrade), false); }
 
-	void						clearCurrentQueue(){ queue.clearAll(); }
+	void						clearCurrentQueue(){ queue.clearAllUnit(); }
 	void						setBuildOrder(const std::vector<MetaType> & buildOrder);
+
+	void						setDroneProductionSpeed(int productionSpeed) { droneProductionSpeed = productionSpeed; }
+	void						setExtractorBuildSpeed(int buildSpeed) { extractorBuildSpeed = buildSpeed; }
 };

@@ -93,6 +93,9 @@
     <ClCompile Include="OverLordArmy.cpp">
       <Filter>Attack</Filter>
     </ClCompile>
+    <ClCompile Include="DefendTactic.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sixZerglingTactic.h">
@@ -171,6 +174,9 @@
       <Filter>Attack</Filter>
     </ClInclude>
     <ClInclude Include="OverLordArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="DefendTactic.h">
       <Filter>Attack</Filter>
     </ClInclude>
   </ItemGroup>

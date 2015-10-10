@@ -30,6 +30,7 @@ class MutaliskHarassTactic : public BattleTactic
 	std::set<BWAPI::Unit*>	moveComplete;
 	BWAPI::Position			moveTarget;
 	int						moveFinishCount;
+	int						triggerChangeTime;
 
 	void					locationAssign(MutaliskArmy* mutalisk, BWAPI::Position endPosition, tacticState nextState, bool nearPosition);
 	void					locationMove(MutaliskArmy* mutalisk, tacticState nextState);

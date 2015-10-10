@@ -3,13 +3,12 @@
 
 // constructor
 StrategyManager::StrategyManager()
-	: firstAttackSent(false)
-	, currentStrategy(0)
-	, selfRace(BWAPI::Broodwar->self()->getRace())
+	: selfRace(BWAPI::Broodwar->self()->getRace())
 	, enemyRace(BWAPI::Broodwar->enemy()->getRace())
 {
 	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg)
 	{
+		
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Drone)); //0
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Overlord)); //1
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Hatchery)); //2
@@ -43,55 +42,97 @@ StrategyManager::StrategyManager()
 		actions.push_back(MetaType(BWAPI::UpgradeTypes::Antennae)); // 26
 	}
 	gameStage = Start;
-	currentStrategyGoal = MutaliskRush;
 	triggerMutaliskBuild = true;
 
 	goalBuildingOrderInit();
 	disableMutaliskHarass = false;
+
+	openingStrategyName.push_back("TwelveHatchMuta");
+	openingStrategyName.push_back("NinePoolling");
+	openingStrategyName.push_back("TenHatchMuta");
+
+	lairTrigger = true;
+	spireTrigger = true;
+
+	mutaUpgradeTrigger = true;
+	hydraUpgradeTrigger = true;
+	overlordUpgradeTrigger = true;
+}
+
+void StrategyManager::setOpeningStrategy(openingStrategy opening)
+{
+	currentopeningStrategy = opening;
+	switch (currentopeningStrategy)
+	{
+	case TwelveHatchMuta:
+		currentStrategy = MutaPush;
+		break;
+	case NinePoolling:
+		currentStrategy = ZerglingPush;
+		break;
+	case TenHatchMuta:
+		currentStrategy = MutaPush;
+		break;
+	default:
+		break;
+	}
+}
+
+int StrategyManager::getStrategyByName(std::string strategy)
+{
+	for (int i = 0; i <int(openingStrategyName.size()); i++)
+	{
+		if (openingStrategyName[i] == strategy)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+std::string	StrategyManager::getStrategyName(openingStrategy strategy)
+{
+	return openingStrategyName[int(strategy)];
 }
 
 
 void StrategyManager::goalBuildingOrderInit()
 {
-	currentStrategyGoal = MutaliskRush;
-
-	goalBuildingOrder[MutaliskRush] = getMetaVector("10 10 10 10 10 10 10 10 10 10 10 10");
-	goalBuildingOrder[MutaHydraRush] = getMetaVector("9 9 9 9 9 9 9 9 9 9 9 9");
+	goalBuildingOrder[HydraPush] = getMetaVector("9");
+	goalBuildingOrder[ZerglingPush] = getMetaVector("4");
+	goalBuildingOrder[MutaPush] = getMetaVector("10");
 }
-
 
 const std::vector<MetaType>& StrategyManager::getCurrentGoalBuildingOrder()
 {
-	int hydriskCount = 0;
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getAllUnits())
-	{
-		if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg)
-		{
-			if (unit->getBuildType() == BWAPI::UnitTypes::Zerg_Hydralisk)
-			{
-				hydriskCount++;
-			}
-		}
-	}
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 
-	if (currentStrategyGoal == MutaHydraRush && (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk) + hydriskCount) > 20 && triggerMutaliskBuild)
+	if ((currentStrategy == HydraPush || currentStrategy == MutaPush)
+		&& BWAPI::Broodwar->self()->minerals() > 500 && BWAPI::Broodwar->self()->gas() < 200 
+		&& BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Larva) >= 2 )
 	{
-		ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 12);
-		triggerMutaliskBuild = false;
-		return goalBuildingOrder[currentStrategyGoal];
+		return goalBuildingOrder[ZerglingPush];
+	}
+	else if (currentStrategy == HydraPush && (selfAllBuilding[BWAPI::UnitTypes::Zerg_Hydralisk_Den].size() == 0 ||
+		(selfAllBuilding[BWAPI::UnitTypes::Zerg_Hydralisk_Den].size() > 0 && !(*selfAllBuilding[BWAPI::UnitTypes::Zerg_Hydralisk_Den].begin())->isCompleted())))
+	{
+		return goalBuildingOrder[ZerglingPush];
 	}
 	else
-		return goalBuildingOrder[currentStrategyGoal];
+		return goalBuildingOrder[currentStrategy];
 }
 
 
-void StrategyManager::goalChange(strategyGoal changeGoal)
+void StrategyManager::goalChange(zergStrategy changeStrategy)
 {
-	//mutalisk fail, change to hydralisk
-	if (changeGoal == MutaHydraRush)
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+
+	if (changeStrategy == HydraPush)
 	{
+		//change to hydra is quick, so do not wait
 		ProductionManager::Instance().clearCurrentQueue();
-		currentStrategyGoal = MutaHydraRush;
+
+		currentStrategy = HydraPush;
 
 		//ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 12);
 
@@ -103,18 +144,35 @@ void StrategyManager::goalChange(strategyGoal changeGoal)
 		}
 		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber) == 0)
 		{
-			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Evolution_Chamber, BWAPI::Broodwar->self()->getStartLocation(), 2);
-
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
+			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Evolution_Chamber, BWAPI::Broodwar->self()->getStartLocation(), 1);
 		}
-		//upgrade overlord
-		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Pneumatized_Carapace);
-		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Ventral_Sacs);
+
+	}
+	else if (changeStrategy == MutaPush)
+	{
+		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 0)
+		{
+			if (lairTrigger)
+			{
+				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Lair, BWAPI::Broodwar->self()->getStartLocation(), 1);
+				lairTrigger = false;
+			}
+		}
+
+		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Spire) == 0)
+		{
+			if (spireTrigger && selfAllBuilding[BWAPI::UnitTypes::Zerg_Lair].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Lair].begin())->isCompleted())
+			{
+				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Spire, BWAPI::Broodwar->self()->getStartLocation(), 1);
+				spireTrigger = false;
+			}
+		}
+		//if all prerequisite building has complete, change strategy
+		if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
+		{
+			currentStrategy = MutaPush;
+			ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 6, true, true);
+		}
 	}
 }
 
@@ -122,72 +180,107 @@ void StrategyManager::baseExpand()
 {
 	BWAPI::TilePosition nextBase = InformationManager::Instance().GetNextExpandLocation();
 	if (nextBase == BWAPI::TilePositions::None)
-		return;
-
-	ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Hatchery, nextBase, 1);
-	//if ((*BWTA::getRegion(nextBase)->getBaseLocations().begin())->getGeysers().size() > 0 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) < 3)
-	if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone) >= 40 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) < 3)
-	{
-		//extractor location is determined in building manager 
-		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Extractor, BWAPI::Broodwar->self()->getStartLocation(), 1);
-	}
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Hatchery, BWAPI::Broodwar->self()->getStartLocation(), 1);
+	else
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Hatchery, nextBase, 1);
 }
 
 
 //key function to adapt change
 void StrategyManager::update()
 {
-	switch (gameStage)
+	if (overlordUpgradeTrigger && BWAPI::Broodwar->getFrameCount() > 12000)
 	{
-	case Start:
-		break;
-	case Mid:
-	{
-		std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
-		int deadCount = BWAPI::Broodwar->self()->deadUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk);
-		int currentCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk);
-		if (currentCount == 0)
-			return;
-		if ((currentCount * 10 / (currentCount + deadCount) <= 2)
-			|| enemyBattle[BWAPI::UnitTypes::Protoss_Corsair].size() >= 8)
-		{
-			disableMutaliskHarass = true;
-		}
+		//overlord speed
+		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Pneumatized_Carapace);
+		overlordUpgradeTrigger = false;
+	}
 
-		switch (currentStrategyGoal)
+	switch (currentStrategy)
+	{
+	case HydraPush:
+	{
+		ProductionManager::Instance().setExtractorBuildSpeed(0);
+		ProductionManager::Instance().setDroneProductionSpeed(250);
+
+		if (hydraUpgradeTrigger && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk) >= 12)
 		{
-		case BaseExpand:
-			break; 
-		case MutaliskRush:
-		{
-			/*
-			std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
-			int deadCount = BWAPI::Broodwar->self()->deadUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk);
-			int currentCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk);
-			if (currentCount == 0)
-				return;
-			if ((currentCount * 10 / (currentCount + deadCount) <= 2)
-				|| (enemyBattle.find(BWAPI::UnitTypes::Protoss_Corsair) != enemyBattle.end() && enemyBattle[BWAPI::UnitTypes::Protoss_Corsair].size() >= 8))
-			{
-				currentStrategyGoal = MutaHydraRush;
-				goalChange(MutaHydraRush);
-			}*/
-		}
-			break;
-		case HydraliskRush:
-			break;
-		case ZerglingRush:
-			break;
-		case MutaHydraRush:
-			break;
-		default:
-			break;
+			hydraUpgradeTrigger = false;
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
 		}
 	}
 		break;
-	case End:
+	case MutaPush:
+	{
+		ProductionManager::Instance().setExtractorBuildSpeed(0);
+		ProductionManager::Instance().setDroneProductionSpeed(250);
+
+		if (mutaUpgradeTrigger && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk) >= 8)
+		{
+			mutaUpgradeTrigger = false;
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Carapace);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Attacks);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Carapace);
+			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Attacks);
+		}
+		
+		std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
+		int enemyAntiAirSupply = 0;
+		for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>::iterator it = enemyBattle.begin(); it != enemyBattle.end(); it++)
+		{
+			if (it->first.airWeapon() != BWAPI::WeaponTypes::None)
+			{
+				enemyAntiAirSupply += it->first.supplyRequired() * it->second.size();
+			}
+		}
+
+		// if lost too many mutalisk , and enemy still have many anti-air army, change to hydrisk
+		if (enemyAntiAirSupply >= 2 * 1.5 * 12 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk) * 3 < enemyAntiAirSupply)
+		{
+			goalChange(HydraPush);
+		}
+
+	}
+		break;
+	case ZerglingPush:
+	{
+		int hatchCompleteCount = 0;
+		BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+		{
+			if (u->getType() == BWAPI::UnitTypes::Zerg_Hatchery && u->isCompleted())
+			{
+				hatchCompleteCount++;
+			}
+			else if (u->getType() == BWAPI::UnitTypes::Zerg_Lair)
+			{
+				hatchCompleteCount++;
+			}
+			else
+				continue;
+		}
+		// slow the drone production speed when only one hatch
+		if (hatchCompleteCount == 1)
+		{
+			ProductionManager::Instance().setDroneProductionSpeed(750);
+		}
+		else
+		{
+			ProductionManager::Instance().setDroneProductionSpeed(250);
+		}
+
+		ProductionManager::Instance().setExtractorBuildSpeed(15);
+
+		if (BWAPI::Broodwar->self()->gas() >= 100)
+		{
+			goalChange(MutaPush);
+		}
+	}
 		break;
 	default:
+
 		break;
 	}
 }
@@ -208,32 +301,32 @@ std::vector<MetaType> StrategyManager::getOpeningBook()
 		//return getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 0 0 0 4 6 1 11 11 0 0 0 0 12 12 8 0 5 1 1 0 0 10 10 10 10 10 10 10 1 10 10 10 10 19");
 
 		//overPool opening
-		return getMetaVector("0 0 0 0 0 1 3 0 0 0 2 4 4 4 0 5 4 0 0 0 6 0 0 0 0 0 0 8 5 0 0 0 1 1 0 0 0 10 10 10 10 10 10 10 1 10 10 10 10 10 19 20 19 20 19 20");
+		//return getMetaVector("0 0 0 0 0 1 3 0 0 0 2 4 4 4 0 5 0 0 0 6 0 0 0 0 0 0 8 5 0 0 0 1 1 0 0 0 10 10 10 10 10 10 10 1 10 10 10 10 10 19 20 19 20 19 20");
+		
+		if (currentopeningStrategy == TwelveHatchMuta)
+		{
+			//12 hatch mutalisk
+			return getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 4 4 4 6 15");
+		}
+		else if (currentopeningStrategy == NinePoolling)
+		{
+			//9 pool zergling
+			return getMetaVector("0 0 0 0 0 3 0 5 0 1 4 4 4 4 15");
+		}
+		else if (currentopeningStrategy == TenHatchMuta)
+		{
+			// 10 hatch counter 2 gate zealot
+			return getMetaVector("0 0 0 0 0 5 0 2 3 0 1 4 4 4 5");
+		}
+		else
+			return getMetaVector("");
 	}
 	else
 		return getMetaVector("");
 }
 
 
-
-const double StrategyManager::getUCBValue(const size_t & strategy) const
-{
-	double totalTrials(0);
-	for (size_t s(0); s < usableStrategies.size(); ++s)
-	{
-		totalTrials += results[usableStrategies[s]].first + results[usableStrategies[s]].second;
-	}
-
-	double C = 0.7;
-	double wins = results[strategy].first;
-	double trials = results[strategy].first + results[strategy].second;
-
-	double ucb = (wins / trials) + C * sqrt(std::log(totalTrials) / trials);
-
-	return ucb;
-}
-
-const int StrategyManager::getScore(BWAPI::Player * player) const
+int StrategyManager::getScore(BWAPI::Player * player)
 {
 	return player->getBuildingScore() + player->getKillScore() + player->getRazingScore() + player->getUnitScore();
 }
@@ -255,90 +348,6 @@ std::vector<MetaType> StrategyManager::getMetaVector(std::string buildString)
 	return meta;
 }
 
-
-// when do we want to defend with our workers?
-// this function can only be called if we have no fighters to defend with
-const int StrategyManager::defendWithWorkers()
-{
-	if (!Options::Micro::WORKER_DEFENSE)
-	{
-		return false;
-	}
-
-	// our home nexus position
-	BWAPI::Position homePosition = BWTA::getStartLocation(BWAPI::Broodwar->self())->getPosition();;
-
-	// enemy units near our workers
-	int enemyUnitsNearWorkers = 0;
-
-	// defense radius of nexus
-	int defenseRadius = 300;
-
-	// fill the set with the types of units we're concerned about
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->enemy()->getUnits())
-	{
-		// if it's a zergling or a worker we want to defend
-		if (unit->getType() == BWAPI::UnitTypes::Zerg_Zergling)
-		{
-			if (unit->getDistance(homePosition) < defenseRadius)
-			{
-				enemyUnitsNearWorkers++;
-			}
-		}
-	}
-
-	// if there are enemy units near our workers, we want to defend
-	return enemyUnitsNearWorkers;
-}
-
-// called by combat commander to determine whether or not to send an attack force
-// freeUnits are the units available to do this attack
-const bool StrategyManager::doAttack(const std::set<BWAPI::Unit *> & freeUnits)
-{
-	int ourForceSize = (int)freeUnits.size();
-
-	int numUnitsNeededForAttack = 1;
-
-	bool doAttack = BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Protoss_Dark_Templar) >= 1
-		|| ourForceSize >= numUnitsNeededForAttack;
-
-	if (doAttack)
-	{
-		firstAttackSent = true;
-	}
-
-	return doAttack || firstAttackSent;
-}
-
-
-const MetaPairVector StrategyManager::getBuildOrderGoal()
-{
-	if (BWAPI::Broodwar->self()->getRace() == BWAPI::Races::Zerg)
-	{
-		return getZergBuildOrderGoal();
-	}
-	return getZergBuildOrderGoal();
-}
-
-
-const MetaPairVector StrategyManager::getZergBuildOrderGoal() const
-{
-	// the goal to return
-	std::vector< std::pair<MetaType, UnitCountType> > goal;
-
-	int numMutas = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk);
-	int numHydras = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk);
-
-	int mutasWanted = numMutas + 6;
-	int hydrasWanted = numHydras + 6;
-
-	goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Zerg_Zergling, 4));
-	//goal.push_back(std::pair<MetaType, int>(BWAPI::TechTypes::Stim_Packs,	1));
-
-	//goal.push_back(std::pair<MetaType, int>(BWAPI::UnitTypes::Terran_Medic,		medicsWanted));
-
-	return (const std::vector< std::pair<MetaType, UnitCountType> >)goal;
-}
 
 void StrategyManager::changeGameStage(zergGameStage curStage)
 {

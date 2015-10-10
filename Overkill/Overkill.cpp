@@ -5,11 +5,165 @@ bool analyzed;
 bool analysis_just_finished;
 
 
+void Overkill::readHistoryFile()
+{
+	historyInfo.clear();
+	fstream historyFile;
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	string filePath = "./bwapi-data/read/";
+	filePath += enemyName;
+	
+	//for each enemy, create a file
+	historyFile.open(filePath.c_str(), ios::in);
+	
+	//file do not exist, first match to the enemy
+	if (!historyFile.is_open())
+	{
+		BWAPI::Broodwar->printf("first match to:   %s", enemyName.c_str());
+		historyFile.close();
+
+		//default opening strategy
+		chooseOpeningStrategy = TenHatchMuta;
+		StrategyManager::Instance().setOpeningStrategy(TenHatchMuta);
+
+		/*
+		if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
+		{
+			chooseOpeningStrategy = TenHatchMuta;
+			StrategyManager::Instance().setOpeningStrategy(TenHatchMuta);
+		}
+		else
+		{
+			chooseOpeningStrategy = TwelveHatchMuta;
+			StrategyManager::Instance().setOpeningStrategy(TwelveHatchMuta);
+			//StrategyManager::Instance().setOpeningStrategy(NinePoolling);
+		}*/
+	}
+	else
+	{
+		BWAPI::Broodwar->printf("read match records with :   %s", enemyName.c_str());
+		string playerResult;
+		// file format:
+		// enemy_name | choose strategy | result
+		while (getline(historyFile, playerResult))
+		{
+			std::stringstream ss(playerResult);
+			std::vector<string> itemList;
+			string item;
+			while (getline(ss, item, '|'))
+			{
+				if (item != "")
+					itemList.push_back(item);
+			}
+			historyInfo.push_back(itemList);
+		}
+
+		//do UCB1 calculate, and set the opening strategy
+		std::map<std::string, std::pair<int, int>> strategyResults;
+		BOOST_FOREACH(std::vector<string> record, historyInfo)
+		{
+			//win
+			if (record[2] == "1")
+			{
+				strategyResults[record[1]].first += 1;
+			}
+			else
+			{
+				strategyResults[record[1]].second += 1;
+			}
+		}
+
+		double experimentCount = historyInfo.size();
+		std::map<std::string, double> strategyUCB;
+		BOOST_FOREACH(std::string opening, StrategyManager::Instance().getStrategyNameArray())
+		{
+			strategyUCB[opening] = 99999;
+		}
+
+		for (std::map<std::string, std::pair<int, int>>::iterator it = strategyResults.begin(); it != strategyResults.end(); it++)
+		{
+			double strategyExpectation = double(it->second.first) / (it->second.first + it->second.second);
+			double uncertainty = 0.7 * std::sqrt(std::log(experimentCount) / (it->second.first + it->second.second));
+			strategyUCB[it->first] = strategyExpectation + uncertainty;
+		}
+		
+		std::string maxUCBStrategy;
+		double maxUCB = 0;
+		for (std::map<std::string, double>::iterator it = strategyUCB.begin(); it != strategyUCB.end(); it++)
+		{
+			if (it->second > maxUCB)
+			{
+				maxUCBStrategy = it->first;
+				maxUCB = it->second;
+			}
+			BWAPI::Broodwar->printf("%s , UCB: %.4f", it->first.c_str(), it->second);
+		}
+
+		BWAPI::Broodwar->printf("choose %s opening", maxUCBStrategy.c_str());
+		int openingId = StrategyManager::Instance().getStrategyByName(maxUCBStrategy);
+		if (openingId != -1)
+		{
+			chooseOpeningStrategy = openingStrategy(openingId);
+		}
+		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
+
+		historyFile.close();
+	}
+}
+
+
+void Overkill::writeCurrentPlay(bool isWin)
+{
+	fstream historyFile;
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	string filePath = "./bwapi-data/write/";
+	filePath += enemyName;
+
+	//for each enemy, create a file
+	historyFile.open(filePath.c_str(), ios::out);
+
+	std::vector<string> currentPlay;
+	currentPlay.push_back(enemyName);
+	currentPlay.push_back(StrategyManager::Instance().getStrategyName(chooseOpeningStrategy));
+	if (isWin)
+		currentPlay.push_back("1");
+	else
+		currentPlay.push_back("0");
+	historyInfo.push_back(currentPlay);
+
+	bool enemyEarlyRushFlag = InformationManager::Instance().getEnemyEarlyRushSuccess();
+	//defeated by early Rush
+	if (enemyEarlyRushFlag && !isWin)
+	{
+		//12 hatch is slower than 10 hatch, so it may definitely loss in this match
+		//add this simulated record to improved ucb learning speed.
+		if (chooseOpeningStrategy == TenHatchMuta)
+		{
+			std::vector<string> simulatedPlay;
+			simulatedPlay.push_back(enemyName);
+			simulatedPlay.push_back(StrategyManager::Instance().getStrategyName(TwelveHatchMuta));
+			simulatedPlay.push_back("0");
+			historyInfo.push_back(simulatedPlay);
+		}
+	}
+
+	BOOST_FOREACH(std::vector<string> record, historyInfo)
+	{
+		BOOST_FOREACH(std::string field, record)
+		{
+			historyFile << field << "|";
+		}
+		historyFile << endl;
+	}
+	
+	historyFile.close();
+}
+
 
 void Overkill::onStart()
 {
 	Broodwar->setLocalSpeed(0);
-	//BWAPI::Broodwar->printf("gl hf :)");
+	BWAPI::Broodwar->sendText("gl hf :)");
 
 	//Broodwar->printf("The map is %s, a %d player map", Broodwar->mapName().c_str(), Broodwar->getStartLocations().size());
 	// Enable some cheat flags
@@ -31,21 +185,35 @@ void Overkill::onStart()
 	analyzed = true;
 	analysis_just_finished = true;
 
-
-
 	show_bullets = false;
 	show_visibility_data = false;
 	show_paths = true;
-
+	readHistoryFile();
 }
 
 
 void Overkill::onEnd(bool isWinner)
 {
-	if (isWinner)
+	int frameElapse = BWAPI::Broodwar->getFrameCount();
+	int currentSupply = BWAPI::Broodwar->self()->supplyUsed();
+
+	bool win = false;
+	// winner is determined by score
+	if (frameElapse >= 80000)
 	{
-		//log win to file
+		int myScore = StrategyManager::Instance().getScore(BWAPI::Broodwar->self());
+		int enemyScore = StrategyManager::Instance().getScore(BWAPI::Broodwar->enemy());
+		if (currentSupply >= 190 * 2)
+			win = true;
+		else
+			win = false;
 	}
+	else
+	{
+		win = isWinner;
+	}
+
+	writeCurrentPlay(win);
 }
 
 
@@ -55,6 +223,19 @@ void Overkill::onFrame()
 		return;
 
 	drawStats();
+
+	/*
+	BOOST_FOREACH(BWAPI::Unit* enemy, BWAPI::Broodwar->enemy()->getUnits())
+	{
+		if (!enemy->isGatheringMinerals())
+		{
+			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x(), enemy->getPosition().y(), 8, BWAPI::Colors::Blue, true);
+		}
+		else
+			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x(), enemy->getPosition().y(), 8, BWAPI::Colors::Red, true);
+	}*/
+
+
 
 	TimerManager::Instance().startTimer(TimerManager::All);
 
@@ -238,7 +419,6 @@ void Overkill::onUnitDestroy(BWAPI::Unit* unit)
 	{
 		AttackManager::Instance().onEnemyUnitDestroy(unit);
 	}
-	
 }
 
 void Overkill::onUnitMorph(BWAPI::Unit* unit)
@@ -254,17 +434,6 @@ void Overkill::onUnitMorph(BWAPI::Unit* unit)
 		if (!unit->getType().isBuilding() && !unit->getType().isWorker() && unit->getType() != BWAPI::UnitTypes::Zerg_Overlord)
 		{
 			AttackManager::Instance().onUnitMorph(unit);
-		}
-		if (unit->getType() == BWAPI::UnitTypes::Zerg_Lair)
-		{
-			BWAPI::Broodwar->printf("change strategy to Mid game!!!");
-			StrategyManager::Instance().changeGameStage(Mid);
-		}
-
-		if (unit->getType() == BWAPI::UnitTypes::Zerg_Hive)
-		{
-			BWAPI::Broodwar->printf("change strategy to End game!!!");
-			StrategyManager::Instance().changeGameStage(End);
 		}
 	}
 }
@@ -298,6 +467,16 @@ void Overkill::drawStats()
 	std::map<UnitType, int> unitTypeCounts;
 	for (std::set<Unit*>::iterator i = myUnits.begin(); i != myUnits.end(); i++)
 	{
+		if (!(*i)->getType().isBuilding() && (*i)->getType().canAttack())
+		{
+			int unitWidth = (*i)->getType().tileWidth() * 32;
+			int unitHeight = (*i)->getType().tileHeight() * 32 / 8;
+			BWAPI::Position unitPosition = (*i)->getPosition();
+			BWAPI::Broodwar->drawBoxMap(unitPosition.x() - unitWidth / 2, unitPosition.y() + unitHeight / 2, unitPosition.x() + unitWidth / 2, unitPosition.y() - unitHeight / 2, BWAPI::Colors::Red, true);
+			double healthPercent = double((*i)->getHitPoints()) / (*i)->getType().maxHitPoints();
+			BWAPI::Broodwar->drawBoxMap(unitPosition.x() - unitWidth / 2, unitPosition.y() + unitHeight / 2, unitPosition.x() - unitWidth / 2 + int(unitWidth * healthPercent), unitPosition.y() - unitHeight / 2, BWAPI::Colors::Green, true);
+		}
+
 		if (unitTypeCounts.find((*i)->getType()) == unitTypeCounts.end())
 		{
 			unitTypeCounts.insert(std::make_pair((*i)->getType(), 0));

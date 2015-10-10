@@ -1,20 +1,75 @@
 #pragma once
 #include "HydraliskTactic.h"
 
+//TODO: put in the battle tactic class
+bool HydraliskTactic::needRetreat()
+{
+	int ourArmySupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size());
+	BOOST_FOREACH(BWAPI::Unit* u, friendUnitNearBy)
+	{
+		ourArmySupply += u->getType().supplyRequired();
+	}
+
+	BWAPI::Unit* firstHydra = (*tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().begin()).unit;
+
+	std::vector<std::vector<gridInfo>>& enemyIm = InformationManager::Instance().getEnemyInfluenceMap();
+	double2 centerPoint(firstHydra->getTilePosition().x(), firstHydra->getTilePosition().y());
+	int maxIM = 0;
+	for (int x = int(centerPoint.x - 8 < 0 ? 0 : centerPoint.x - 8); x <= int(centerPoint.x + 8 > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : centerPoint.x + 8); x++)
+	{
+		for (int y = int(centerPoint.y - 8 < 0 ? 0 : centerPoint.y - 8); y <= int(centerPoint.y + 8 > BWAPI::Broodwar->mapHeight() - 1 ? BWAPI::Broodwar->mapHeight() - 1 : centerPoint.y + 8); y++)
+		{
+			if (enemyIm[x][y].groundForce > maxIM)
+			{
+				maxIM = int(enemyIm[x][y].groundForce);
+			}
+		}
+	}
+
+	if (ourArmySupply <= maxIM / 4)
+	{
+		return true;
+	}
+
+	int enemySupply = 0;
+	BOOST_FOREACH(BWAPI::Unit* u, nearbyUnits)
+	{
+		if (u->getType().isBuilding() && u->isCompleted() && (u->getType().groundWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker))
+		{
+			if (u->getType() == BWAPI::UnitTypes::Terran_Bunker)
+				enemySupply += 8;
+			else
+				enemySupply += 6;
+		}
+		else if (u->getType().groundWeapon() != BWAPI::WeaponTypes::None)
+		{
+			enemySupply += u->getType().supplyRequired();
+		}
+		else
+			continue;
+	}
+
+	if (ourArmySupply * 1.2 < enemySupply)
+		return true;
+	else
+		return false;
+}
+
 
 void HydraliskTactic::update()
 {
 
 	HydraliskArmy* hydralisks = dynamic_cast<HydraliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]);
-	MutaliskArmy* mutalisks = dynamic_cast<MutaliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]);
 	OverLordArmy* overlords = dynamic_cast<OverLordArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Overlord]);
 
-	if (hydralisks->getUnits().size() == 0 && mutalisks->getUnits().size() == 0 && overlords->getUnits().size() == 0)
+
+	if (hydralisks->getUnits().size() == 0)
 	{
 		state = END;
 		return;
 	}
-		
+
+	BWAPI::Unit* firstHydra = hydralisks->getUnits().front().unit;
 
 	if ((*BWTA::getRegion(attackPosition)->getBaseLocations().begin())->isIsland())
 	{
@@ -22,149 +77,185 @@ void HydraliskTactic::update()
 		return;
 	}
 
-	newArmyRally();
-
-	BWAPI::Broodwar->drawLineMap((*hydralisks->getUnits().begin()).unit->getPosition().x(), (*hydralisks->getUnits().begin()).unit->getPosition().y(), attackPosition.x(), attackPosition.y(), Colors::Green);
-
-	switch (state)
+	if (BWAPI::Broodwar->getFrameCount() % 25 * 5 == 0)
 	{
-	case GROUPARMY:
-	{
-		/*
-		BWAPI::Unit* unit = (*tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().begin()).unit;
-
-		std::set<BWTA::Region *> & enemyRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->enemy());
-		std::set<BWTA::Region*> nearRegions = BWTA::getRegion(attackPosition)->getReachableRegions();
-		std::list<BWTA::Region*> needFindRegions;
-		std::set<BWTA::Region*> checkedRegions;
-		BWTA::Region* nextRegion = BWTA::getRegion(attackPosition);
-		checkedRegions.insert(BWTA::getRegion(attackPosition));
-
-		while (true)
+		newAddMovePositions.clear();
+		newAddMovePositions.push_back((*hydralisks->getUnits().begin()).unit->getPosition());
+		for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 		{
-			for (std::set<BWTA::Region*>::iterator it = nearRegions.begin(); it != nearRegions.end(); it++)
-			{
-				double newDistance = BWTA::getGroundDistance(unit->getTilePosition(), BWAPI::TilePosition((*it)->getCenter()));
-				double oldDistance = BWTA::getGroundDistance(unit->getTilePosition(), BWAPI::TilePosition(nextRegion->getCenter()));
-				if (newDistance > oldDistance)
-					continue;
-
-				if (enemyRegions.find(*it) == enemyRegions.end())
-				{
-					movePosition = (*it)->getCenter();
-					break;
-				}
-				else
-				{
-					if (checkedRegions.find(*it) == checkedRegions.end())
-					{
-						needFindRegions.push_back(*it);
-					}
-				}
-			}
-			if (movePosition != BWAPI::Positions::None)
-			{
-				state = MOVE;
-				break;
-			}
-			if (needFindRegions.size() == 0)
-			{
-				state = ATTACK;
-				break;
-			}
-			nextRegion = needFindRegions.front();
-			needFindRegions.pop_front();
-			nearRegions = nextRegion->getReachableRegions();
-			checkedRegions.insert(nextRegion);
-		}*/
-
-		state = ATTACK;
+			it->second = newAddMovePositions;
+		}
 	}
-	break;
 
-	case ATTACK:
+	// overlord follow
+	if (overlords->getUnits().size() > 0)
 	{
-		if (hydralisks->getUnits().size() <= 2 && mutalisks->getUnits().size() == 0)
-			state = END;
-
-		if (!hasEnemy())
-		{
-			state = END;
-		}
-
-		std::vector<hydrliskDistance> armyDistance;
-		BOOST_FOREACH(UnitState u, hydralisks->getUnits())
-		{
-			armyDistance.push_back(hydrliskDistance(u.unit, u.unit->getDistance(attackPosition)));
-		}
-		std::sort(armyDistance.begin(), armyDistance.end());
-		
-		hydralisks->attack(attackPosition);
-
-		bool enemyExsit = false;
-		int antiAirBuildingCount = 0;
-		std::set<BWAPI::Unit*> enemySet = armyDistance[0].unit->getUnitsInRadius(12 * 32);
-
-		BWAPI::Broodwar->drawCircleMap(armyDistance[0].unit->getPosition().x(), armyDistance[0].unit->getPosition().y(), 12 * 32, BWAPI::Colors::Green, false);
-		
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
-		{
-			BWAPI::UnitType unitType = u->getType();
-			if (u->getPlayer() == BWAPI::Broodwar->enemy()
-				&& (unitType == BWAPI::UnitTypes::Terran_Missile_Turret
-				|| unitType == BWAPI::UnitTypes::Zerg_Spore_Colony))
-			{
-				antiAirBuildingCount++;
-			}
-			
-			if (u->getPlayer() == BWAPI::Broodwar->enemy())
-			{
-				enemyExsit = true;
-			}
-		}
-
-		// overlord follow
 		std::vector<UnitState>&	 overlordUnits = overlords->getUnits();
 		for (int i = 0; i < int(overlordUnits.size()); i++)
 		{
-			double splitPercent = i / double(overlordUnits.size());
-			overlordUnits[i].unit->follow(armyDistance[int(armyDistance.size() * splitPercent)].unit);
+			if (i == 0)
+			{
+				overlordUnits[i].unit->follow(hydralisks->getUnits().front().unit);
+			}
+			else
+			{
+				overlordUnits[i].unit->follow(hydralisks->getUnits().back().unit);
+			}
 		}
+	}
 
-		// mutalisk attack 
-		if (enemyExsit && antiAirBuildingCount <= 3)
-			//snipe the high priority enemy unit in hydralisk's range
-			mutalisks->mixArmyAttack((*hydralisks->getUnits().begin()).unit->getPosition());
-		else
+
+	newArmyRally();
+
+	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	nearbyUnits.clear();
+	friendUnitNearBy.clear();
+	std::set<BWAPI::Unit*> tmp = firstHydra->getUnitsInRadius(12 * 32);
+	// if enemy can attack us, add in nearby enemies count
+	BOOST_FOREACH(BWAPI::Unit* unit, tmp)
+	{
+		if (unit->getPlayer() == BWAPI::Broodwar->enemy())
 		{
-			//if no enemy exsit, move to hydralisk's back
-			BWAPI::Unit* unit = armyDistance[int(armyDistance.size() / 2)].unit;
-
-			double2 direc = movePosition - unit->getPosition();
-			double2 direcNormal = direc / direc.len();
-
-			int targetx = unit->getPosition().x() + int(direcNormal.x * 32 * 6);
-			int targety = unit->getPosition().y() + int(direcNormal.y * 32 * 6);
-
-			BWAPI::Position p(targetx, targety);
-			mutalisks->armyMove(p);
+			nearbyUnits.insert(unit);
 		}
+
+		if (unit->getPlayer() == BWAPI::Broodwar->self() && !unit->getType().isBuilding()
+			&& unit->getType() != BWAPI::UnitTypes::Zerg_Hydralisk && !unit->getType().isWorker() && unit->getType() != BWAPI::UnitTypes::Zerg_Overlord)
+		{
+			friendUnitNearBy.insert(unit);
+		}
+	}
+
+
+	BWAPI::Position moveBackBase;
+	if (myRegions.size() > 1)
+		moveBackBase = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
+	else
+		moveBackBase = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+	std::set<BWAPI::Unit*> unitsInCircle;
+	unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(moveBackBase, 12 * 32);
+
+	std::set<BWAPI::Unit*> enemyInCircle;
+	BOOST_FOREACH(BWAPI::Unit* enemy, unitsInCircle)
+	{
+		if (enemy->getPlayer() == BWAPI::Broodwar->enemy())
+		{
+			if (enemy->getType().isFlyer() && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
+
+			enemyInCircle.insert(enemy);
+		}
+	}
+
+	switch (state)
+	{
+	case ATTACK:
+	{
+		if (!hasEnemy())
+		{
+			state = END;
+			break;
+		}
+
+		if (needRetreat() && enemyInCircle.size() == 0)
+		{
+			state = RETREAT;
+			
+			retreatCount++;
+			if (retreatCount >= 5)
+			{
+				state = END;
+				break;
+			}
+
+			retreatTime = BWAPI::Broodwar->getFrameCount() + 5 * 25;
+			if (myRegions.size() > 1)
+				nextRetreatPosition = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
+			else
+				nextRetreatPosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+
+			break;
+		}
+		
+		hydralisks->attack(attackPosition);
 	}
 	break;
 
 	case RETREAT:
 	{
-		hydralisks->armyMove(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
-		state = END;
+		bool isUnderAttack = false;
+		BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits())
+		{
+			if (u.unit->isUnderAttack())
+			{
+				isUnderAttack = true;
+				break;
+			}
+		}
+		// if no enemy nearby, wait to attack again
+		if (nearbyUnits.size() == 0 && !isUnderAttack)
+		{
+			state = WAIT;
+			nextAttackTime = BWAPI::Broodwar->getFrameCount() + 5 * 25;
+		}
+
+		hydralisks->armyMove(nextRetreatPosition);
+
+		//if we reach the retreat position and still under attack, change to attack mode to choose the next action
+		if (BWAPI::Broodwar->getFrameCount() >= retreatTime && (isUnderAttack || nearbyUnits.size() > 0))
+		{
+			state = ATTACK;
+			break;
+		}
 	}
 	break;
+
+	case WAIT:
+	{
+		if (nearbyUnits.size() == 0)
+		{
+			// do regroup 
+			hydralisks->armyMove(firstHydra->getPosition());
+
+			// waiting for hydralisks
+			if (BWAPI::Broodwar->getFrameCount() > nextAttackTime && hydralisks->getUnits().size() >= 24)
+				state = ATTACK;
+		}
+		// has nearby enemy
+		else
+		{
+			state = ATTACK;
+		}
+		break;
+	}
+
+	case GROUPARMY:
+	{
+		hydralisks->armyMove(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+
+		BOOST_FOREACH(UnitState u, hydralisks->getUnits())
+		{
+			if (u.unit->getPosition().getDistance(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation())) < 32 * 10)
+			{
+				state = END;
+				break;
+			}
+		}
+		break;
+	}
 	}
 }
+
 
 bool HydraliskTactic::isTacticEnd()
 {
 	if (state == END)
+	{
+		if (tacticArmy[BWAPI::UnitTypes::Zerg_Overlord]->getUnits().size() > 0)
+			tacticArmy[BWAPI::UnitTypes::Zerg_Overlord]->armyMove(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
 		return true;
+	}
 	else
 		return false;
 }
@@ -172,8 +263,11 @@ bool HydraliskTactic::isTacticEnd()
 
 HydraliskTactic::HydraliskTactic()
 {
-	state = GROUPARMY;
+	state = ATTACK;
 	movePosition = BWAPI::Positions::None;
+	newAddMovePositions.push_back(attackPosition);
+
+	retreatCount = 0;
 }
 
 void HydraliskTactic::generateAttackPath()

@@ -43,8 +43,15 @@ void BuildingManager::update()
 				it->buildingState = Building::end;
 				return;
 			}
+
+			if (!it->builderUnit->isConstructing())
+			{
+				WorkerManager::Instance().finishedWithWorker(it->builderUnit);
+				it->builderUnit = NULL;
+				it->buildingState = Building::initBuilderAndLocation;
+			}
 			// issue the build order!
-			it->builderUnit->build(it->finalPosition, it->type);
+			//it->builderUnit->build(it->finalPosition, it->type);
 		}
 		break;
 		case Building::buildingOrderCheck:
@@ -70,26 +77,23 @@ void BuildingManager::update()
 // STEP 2: ASSIGN WORKERS TO BUILDINGS WITHOUT THEM
 void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
 {
-	// get the building location
-	BWAPI::TilePosition testLocation = getBuildingLocation(b);
-
-	// if we can't find a valid build location, we can't assign this building
-	if (!testLocation.isValid())
-	{
-		return;
-	}
-
-	// set the final position of the building as this location
-	b.finalPosition = testLocation;
-
-	// grab a worker unit from WorkerManager which is closest to this final position
+	b.finalPosition = b.desiredPosition;
 	BWAPI::Unit * workerToAssign = WorkerManager::Instance().getBuilder(b);
-
-	// if the worker exists
-	if (workerToAssign) 
+	if (workerToAssign)
 	{
 		// set the worker we have assigned
 		b.builderUnit = workerToAssign;
+		// get the building location
+		BWAPI::TilePosition testLocation = getBuildingLocation(b);
+		// if we can't find a valid build location, do not build at this frame
+		if (!testLocation.isValid())
+		{
+			WorkerManager::Instance().finishedWithWorker(b.builderUnit);
+			return;
+		}
+		// set the final position of the building as this location
+		b.finalPosition = testLocation;
+
 		if (!isBuildingPositionExplored(b))
 		{
 			b.buildingState = Building::exploreMove;
@@ -97,12 +101,38 @@ void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
 		else
 		{
 			if (b.type.isRefinery())
+			{
 				b.buildingState = Building::refinerySpecial;
+				b.builderUnit->build(b.finalPosition, b.type);
+			}
 			else
 				b.buildingState = Building::issueBuildOrder;
 		}
-			
+
+		/*
+		// grab a worker unit from WorkerManager which is closest to this final position
+		BWAPI::Unit * workerToAssign = WorkerManager::Instance().getBuilder(b);
+
+		// if the worker exists
+		if (workerToAssign)
+		{
+			// set the worker we have assigned
+			b.builderUnit = workerToAssign;
+			if (!isBuildingPositionExplored(b))
+			{
+				b.buildingState = Building::exploreMove;
+			}
+			else
+			{
+				if (b.type.isRefinery())
+					b.buildingState = Building::refinerySpecial;
+				else
+					b.buildingState = Building::issueBuildOrder;
+			}
+
+		}*/
 	}
+	
 }
 
 void BuildingManager::exploreUnseenPosition(Building& b)
@@ -110,6 +140,9 @@ void BuildingManager::exploreUnseenPosition(Building& b)
 	if (!b.builderUnit->exists())
 	{
 		b.buildingState = Building::initBuilderAndLocation;
+		//if worker have been killed outside, build hatchery at main base
+		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
+			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
 		return;
 	}
 
@@ -140,6 +173,8 @@ void BuildingManager::constructAssignedBuildings(Building& b)
 	if (!b.builderUnit->exists())
 	{
 		b.buildingState = Building::initBuilderAndLocation;
+		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
+			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
 		return;
 	}
 
@@ -155,22 +190,24 @@ void BuildingManager::buildingOrderCheck(Building& b)
 	if (!b.builderUnit->exists())
 	{
 		b.buildingState = Building::initBuilderAndLocation;
+		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
+			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
 		return;
 	}
 
 	if (b.builderUnit->isMorphing())
 	{
-		WorkerManager::Instance().finishedWithWorker(b.builderUnit);
+		//WorkerManager::Instance().finishedWithWorker(b.builderUnit);
 		b.builderUnit = NULL;
 		b.buildingState = Building::end;
 	}
+	//if build command fail, something is wrong
 	else if (!b.builderUnit->isConstructing())
 	{
 		WorkerManager::Instance().finishedWithWorker(b.builderUnit);
 		b.builderUnit = NULL;
 		b.buildingState = Building::initBuilderAndLocation;
 	}
-
 }
 
 
@@ -185,7 +222,7 @@ BWAPI::TilePosition BuildingManager::getBuildingLocation(const Building & b)
 		return getRefineryPosition();
 	}
 
-	if (b.type == BWAPI::UnitTypes::Zerg_Hatchery || b.type == BWAPI::UnitTypes::Zerg_Creep_Colony)
+	if (b.type == BWAPI::UnitTypes::Zerg_Creep_Colony) // b.type == BWAPI::UnitTypes::Zerg_Hatchery || 
 		testLocation = getBuildLocationNear(b, 0, false);
 	else
 		testLocation = getBuildLocationNear(b, 1, false);
@@ -199,23 +236,21 @@ BWAPI::TilePosition BuildingManager::getRefineryPosition()
 {
 	int closest = 999999;
 	BWAPI::TilePosition position = BWAPI::TilePositions::None;
+	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+
+	//BWAPI::Broodwar->getGeysers() return all accessable gaysers that can not build extractor
 	BOOST_FOREACH(BWAPI::Unit* geyser, BWAPI::Broodwar->getGeysers())
-	{
-		std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	{	
 		//not my region
 		if (myRegions.find(BWTA::getRegion(geyser->getPosition())) == myRegions.end())
 		{
 			continue;
 		}
-		std::set<BWAPI::Unit*>& hasBuild = BWAPI::Broodwar->getUnitsOnTile(geyser->getTilePosition().x(), geyser->getTilePosition().y());
-		// only have resource unit, no extractor
-		if (hasBuild.size() == 1)
+
+		if (geyser->getDistance(InformationManager::Instance().GetOurBaseUnit()->getPosition()) < closest)
 		{
-			if (geyser->getDistance(InformationManager::Instance().GetOurBaseUnit()->getPosition()) < closest)
-			{
-				closest = geyser->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
-				position = geyser->getTilePosition();
-			}
+			closest = geyser->getDistance(InformationManager::Instance().GetOurBaseUnit()->getPosition());
+			position = geyser->getTilePosition();
 		}
 	}
 	return position;
@@ -238,7 +273,6 @@ BWAPI::TilePosition BuildingManager::getBuildLocationNear(const Building & b, in
 
 	while (length < BWAPI::Broodwar->mapWidth()) //We'll ride the spiral to the end
 	{
-
 		//if we can build here, return this tile position
 		if (x >= 0 && x < BWAPI::Broodwar->mapWidth() && y >= 0 && y < BWAPI::Broodwar->mapHeight())
 		{
@@ -322,6 +356,7 @@ BWAPI::TilePosition BuildingManager::getBuildLocationNear(const Building & b, in
 //space value is stored in this->buildDistance.
 bool BuildingManager::canBuildHereWithSpace(BWAPI::TilePosition position, const Building & b, int buildDist, bool horizontalOnly) const
 {
+	
 	//if we can't build here, we of course can't build here with space
 	if (!BWAPI::Broodwar->canBuildHere(b.builderUnit, position, b.type))
 	{

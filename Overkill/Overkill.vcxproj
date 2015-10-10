@@ -19,6 +19,7 @@
     <ClCompile Include="BuildingManager.cpp" />
     <ClCompile Include="BuildOrderQueue.cpp" />
     <ClCompile Include="Common.cpp" />
+    <ClCompile Include="DefendTactic.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="HydraliskArmy.cpp" />
     <ClCompile Include="HydraliskTactic.cpp" />
@@ -48,6 +49,7 @@
     <ClInclude Include="BuildingManager.h" />
     <ClInclude Include="BuildOrderQueue.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="DefendTactic.h" />
     <ClInclude Include="HydraliskArmy.h" />
     <ClInclude Include="HydraliskTactic.h" />
     <ClInclude Include="InformationManager.h" />

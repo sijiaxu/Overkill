@@ -17,6 +17,7 @@ InformationManager::InformationManager()
 			selfAllBase.insert(u);
 	}
 	enemyStartBaseLocation = BWAPI::TilePositions::None;
+	enemyNaturalBaseLocation = BWAPI::TilePositions::None;
 	firstColonyLocation = BWAPI::TilePositions::None;
 
 	selfAllBattleUnit[BWAPI::UnitTypes::Zerg_Zergling] = std::set<BWAPI::Unit*>();
@@ -52,7 +53,18 @@ InformationManager::InformationManager()
 	midRushFlag = true;
 
 	earlyRush = true;
-	
+
+	defendAddSupply = 0;
+	waitToBuildSunker = 0;
+
+	baseSunkenBuildingPosition = BWAPI::TilePositions::None;
+	natrualSunkenBuildingPosition = BWAPI::TilePositions::None;
+
+	enemyEarlyRushSuccess = false;
+	airDropTrigger = true;
+
+	airDefendTrigger = true;
+	chamberTrigger = true;
 }
 
 
@@ -72,167 +84,222 @@ void InformationManager::checkSelfNewDepotFinish()
 			if (BWAPI::Broodwar->getFrameCount() > waitforDepotTime)
 			{
 				WorkerManager::Instance().balanceWorkerOnDepotComplete(depot);
-				if (BWTA::getRegion(selfNaturalBaseLocation) == BWTA::getRegion(depot->getPosition()))
-					ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(selfNaturalChokePoint), 1);
-				else
-					ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, depot->getTilePosition(), 1);
+				//if (BWTA::getRegion(selfNaturalBaseLocation) == BWTA::getRegion(depot->getPosition()))
+					//ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(selfNaturalChokePoint), 1);
+				//else
+					//ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, depot->getTilePosition(), 1);
 
 				depotBalanceFlag = true;
 				depotTrigMap[depot] = true;
 			}
 		}
 	}
-
-	//trig for defend rush building when natural complete
-	BOOST_FOREACH(BWAPI::Unit* depot, selfAllBase)
-	{
-		if (depot->isCompleted() && depot->getDistance(BWAPI::Position(getOurNatrualLocation())) < 5 * 32)
-		{
-			if (natrualFlag)
-			{
-				natrualFlag = false;
-				waitTime = BWAPI::Broodwar->getFrameCount() + 30 * 3;
-			}
-			if (BWAPI::Broodwar->getFrameCount() > waitTime && !zealotRushFlag && zealotRushTrig)
-			{
-				ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Drone, 2);
-				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(selfNaturalChokePoint), 2);
-				
-				zealotRushTrig = false;
-			}
-		}
-	}
 }
 
 
-void InformationManager::checkEarlyRush()
+void InformationManager::checkEarlyRushDefend()
 {
-	if (BWAPI::Broodwar->getFrameCount() < 6000 && zealotRushFlag)
+	if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
+		return;
+
+	if (BWAPI::Broodwar->getFrameCount() % 25 == 0)
+		return;
+
+	//zergling and sunken is just for early game defend
+	//if (BWAPI::Broodwar->getFrameCount() > 12000 && BWAPI::Broodwar->getFrameCount() % 50 == 0)
+		//return;
+
+	int enemySupply = 0;
+	for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>::iterator it = enemyAllBattleUnit.begin(); it != enemyAllBattleUnit.end(); it++)
 	{
-		if (enemyAllBuilding[BWAPI::UnitTypes::Protoss_Gateway].size() >= 2 || enemyAllBattleUnit[BWAPI::UnitTypes::Protoss_Zealot].size() >= 3
-			|| enemyAllBuilding[BWAPI::UnitTypes::Terran_Marine].size() >= 6)
+		if (it->first.canAttack() && !it->first.isWorker())
 		{
-			BWAPI::Broodwar->printf("detect early zealot rush");
-			zealotRushFlag = false;
-			ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Zergling, 3);
-		}
-	}
-}
-
-
-void InformationManager::checkMidRush()
-{
-	if (BWAPI::Broodwar->getFrameCount() > 6000 && BWAPI::Broodwar->getFrameCount() < 12000 && midRushFlag)
-	{
-		int enemySupply = 0;
-		typedef std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>::value_type battleType;
-		BOOST_FOREACH(battleType units, enemyAllBattleUnit)
-		{
-			if (units.first.canAttack() && !units.first.isWorker())
+			if (it->first == BWAPI::UnitTypes::Protoss_Zealot)
 			{
-				enemySupply += units.first.supplyRequired() * units.second.size();
-			}
-		}
-
-		int ourSupply = 0;
-		BOOST_FOREACH(battleType units, selfAllBattleUnit)
-		{
-			if (units.first.canAttack() && !units.first.isWorker())
-			{
-				ourSupply += units.first.supplyRequired() * units.second.size();
-			}
-		}
-
-		if (enemySupply > (ourSupply + int(selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony].size()) * 4 * 2) * 1.2)
-		{
-			ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Drone, 1);
-
-			if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() > 0)
-			{
-				BWAPI::TilePosition buildingLocation = BWAPI::TilePositions::None;
-				BOOST_FOREACH(BWAPI::Unit* sunken, selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony])
-				{
-					if (BWTA::getRegion(sunken->getTilePosition()) == BWTA::getRegion(selfNaturalBaseLocation))
-					{
-						buildingLocation = sunken->getTilePosition();
-						break;
-					}
-				}
-				if (buildingLocation != BWAPI::TilePositions::None)
-					ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, buildingLocation, 1);
-				else
-					ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(selfNaturalChokePoint), 1);
+				enemySupply += int(it->first.supplyRequired() * int(it->second.size()) * 0.9);
 			}
 			else
 			{
-				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(selfNaturalChokePoint), 1);
+				enemySupply += it->first.supplyRequired() * int(it->second.size());
 			}
-			midRushFlag = false;
 		}
+	}
+
+	int enemyWorkerSupply = 0;
+	BOOST_FOREACH(BWAPI::Unit* enemyWorker, BWAPI::Broodwar->enemy()->getUnits())
+	{
+		if (enemyWorker->getType().isWorker() && (enemyWorker->isAttacking() || enemyWorker->isMoving()) && occupiedRegions[1].size() > 0
+			&& occupiedRegions[1].find(BWTA::getRegion(enemyWorker->getPosition())) == occupiedRegions[1].end())
+		{
+			enemyWorkerSupply += enemyWorker->getType().supplyRequired();
+		}
+	}
+	if (enemyWorkerSupply > 2)
+	{
+		enemySupply += enemyWorkerSupply;
+	}
+
+	int ourSupply = 0;
+	int zerglingsCount = 0;
+	for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>::iterator it = selfAllBattleUnit.begin(); it != selfAllBattleUnit.end(); it++)
+	{
+		if (it->first.canAttack() && !it->first.isWorker())
+		{
+			ourSupply += it->first.supplyRequired() * int(it->second.size());
+			if (it->first == BWAPI::UnitTypes::Zerg_Zergling)
+			{
+				zerglingsCount += int(it->second.size());
+			}
+		}
+	}
+
+	
+	//army is under morph
+	int morphSupply = 0;
+	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getAllUnits())
+	{
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg)
+		{
+			if (unit->getBuildType().canAttack() && !unit->getBuildType().isWorker())
+			{
+				if (unit->getBuildType() == BWAPI::UnitTypes::Zerg_Zergling)
+				{
+					zerglingsCount += 2;
+					morphSupply += unit->getBuildType().supplyRequired() * 2;
+				}
+				else
+					morphSupply += unit->getBuildType().supplyRequired();
+			}
+		}
+	}
+	ourSupply += morphSupply;
+
+	//waiting to produce unit
+	int waitingProductSupply = 0;
+	std::vector<BWAPI::UnitType> waitingProduct = ProductionManager::Instance().getWaitingProudctUnit();
+	BOOST_FOREACH(BWAPI::UnitType u, waitingProduct)
+	{
+		if (u == BWAPI::UnitTypes::Zerg_Zergling)
+		{
+			zerglingsCount += 2;
+			waitingProductSupply += u.supplyRequired() * 2;
+		}
+		else
+			waitingProductSupply += u.supplyRequired();
+	}
+	ourSupply += waitingProductSupply;
+	
+	//need zergling to scout for enemy info
+	if (zerglingsCount <= 2 && selfAllBuilding[BWAPI::UnitTypes::Zerg_Spawning_Pool].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spawning_Pool].begin())->isCompleted())
+	{
+		ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Zergling, 1);
+	}
+	
+	//add sunken's force
+	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
+		ourSupply += (selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() + waitToBuildSunker) * 6;
+	else
+		ourSupply += (selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() + waitToBuildSunker) * 8;
+
+	if (ourSupply < enemySupply)
+	{
+		int productionSupply = enemySupply - ourSupply;
+
+		if (productionSupply <= 1)
+			return;
+
+		/*
+		//if spire is morphing more than 2 / 3, do not trigger other unit morphing
+		if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 &&
+			(*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->getRemainingBuildTime() < BWAPI::UnitTypes::Zerg_Spire.buildTime() / 5)
+			return;*/
+		/*
+		if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
+			ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, productionSupply / 4);
+		else if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Hydralisk_Den].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Hydralisk_Den].begin())->isCompleted())
+			ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Hydralisk, productionSupply / 2);
+		else*/ 
+		if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spawning_Pool].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spawning_Pool].begin())->isCompleted())
+		{
+			openingStrategy opening = StrategyManager::Instance().getCurrentopeningStrategy();
+
+			//is natural complete
+			bool isNatrualComplete = false;
+			BOOST_FOREACH(BWAPI::Unit* base, selfAllBuilding[BWAPI::UnitTypes::Zerg_Hatchery])
+			{
+				if (BWTA::getRegion(base->getPosition()) == BWTA::getRegion(getOurNatrualLocation()))
+				{
+					if (base->isCompleted())
+						isNatrualComplete = true;
+				}
+			}
+
+			//if we have more than 6 zerglings, build sunken to defend first
+			if (opening != NinePoolling && (occupiedRegions[0].size() > 1 && isNatrualComplete || occupiedRegions[0].size() == 1)
+				&& zerglingsCount >= 6 && selfAllBuilding[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() + waitToBuildSunker <= 3)
+			{
+				int count;
+				if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
+					count = productionSupply / 6 + 1 >= 3 ? 3 : productionSupply / 8 + 1;
+				else
+					count = productionSupply / 8 + 1 >= 3 ? 3 : productionSupply / 8 + 1;
+				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, getSunkenBuildingPosition(), count);
+				waitToBuildSunker += count;
+			}
+			else
+			{
+				ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Zergling, productionSupply / 2);
+			}
+
+		}
+		else
+			return;
 	}
 }
 
-
-void InformationManager::checkVeryEarlyRush()
+void InformationManager::checkAirDrop()
 {
-	if (BWAPI::Broodwar->getFrameCount() < 5000 && earlyRush)
+	if (BWAPI::Broodwar->getFrameCount() > 12000)
+		return;
+
+	if (airDropTrigger && enemyAllBattleUnit[BWAPI::UnitTypes::Protoss_Shuttle].size() > 0 || enemyAllBattleUnit[BWAPI::UnitTypes::Terran_Dropship].size() > 0)
 	{
-		bool hasEnemy = false;
-		BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
-		{
-			if (enemyUnit->getType().isWorker() || enemyUnit->getType() == BWAPI::UnitTypes::Zerg_Overlord)
-				continue;
-			//TODO: invisible unit can be get from api, bug
-			if (occupiedRegions[0].find(BWTA::getRegion(BWAPI::TilePosition(enemyUnit->getPosition()))) != occupiedRegions[0].end()
-				&& (enemyUnit->getType().canAttack() || enemyUnit->getType() == BWAPI::UnitTypes::Terran_Bunker))
-			{
-				hasEnemy = true;
-			}
-		}
+		//ProductionManager::Instance().triggerUnit(BWAPI::UnitTypes::Zerg_Zergling, 3);
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::Broodwar->self()->getStartLocation(), 2);
+		airDropTrigger = false;
+	}
+}
 
-		BWAPI::TilePosition trueNatrual;
-		double closest = 999999999;
-		BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
-		{
-			//check if it is not our base
-			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < 90)
-			{
-				continue;
-			}
-			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest )
-			{
-				closest = base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation));
-				trueNatrual = base->getTilePosition();
-			}
-		}
+void InformationManager::checkAirDefend()
+{
+	if (chamberTrigger && enemyAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber) == 0)
+	{
+		chamberTrigger = false;
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Evolution_Chamber, BWAPI::Broodwar->self()->getStartLocation(), 1);
+	}
 
-		if (hasEnemy || 
-			(enemyAllBuilding.find(BWAPI::UnitTypes::Terran_Barracks) != enemyAllBuilding.end()
-			&& (BWTA::getRegion((*enemyAllBuilding[BWAPI::UnitTypes::Terran_Barracks].begin())->getPosition()) == BWTA::getRegion(selfNaturalBaseLocation)
-			|| BWTA::getRegion((*enemyAllBuilding[BWAPI::UnitTypes::Terran_Barracks].begin())->getPosition()) == BWTA::getRegion(trueNatrual))))
-		{
-			BWAPI::Broodwar->printf("detect early rush");
-			earlyRush = false;
-			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, BWAPI::TilePosition(BWTA::getNearestChokepoint(selfStartBaseLocation)->getCenter()), 1);
-		}
+	if (airDefendTrigger && enemyAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*enemyAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
+	{
+		airDefendTrigger = false;
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Spore_Colony, BWAPI::Broodwar->self()->getStartLocation(), 1);
+		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Spore_Colony, selfNaturalBaseLocation, 1);
 	}
 }
 
 void InformationManager::update()
 {
-	checkSelfNewDepotFinish();
+	//checkSelfNewDepotFinish();
+	checkAirDefend();
 
-	checkEarlyRush();
+	checkAirDrop();
 
-	checkMidRush();
+	checkEarlyRushDefend();
 
-	checkVeryEarlyRush();
 
-	//if (BWAPI::Broodwar->getFrameCount() % 25 == 0)
 	updateEnemyUnitInfluenceMap();
 
+	//for enemy buildings not destroy by us
 	checkOccupiedDetail();
-
 }
 
 
@@ -265,17 +332,18 @@ BWAPI::TilePosition	InformationManager::GetNextExpandLocation()
 	BWAPI::TilePosition nextBase = BWAPI::TilePositions::None;
 	BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
 	{
+		/*
 		//check if it is not our base
 		if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < 90)
 		{
 			continue;
-		}
+		}*/
 		//already expand
 		if (occupiedRegions[0].find(base->getRegion()) != occupiedRegions[0].end() || occupiedRegions[1].find(base->getRegion()) != occupiedRegions[1].end())
 		{
 			continue;
 		}
-		if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest && base->getGeysers().size() > 0)
+		if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest && base->getGeysers().size() > 0 && !base->isIsland())
 		{
 			closest = base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation));
 			nextBase = base->getTilePosition();
@@ -286,17 +354,18 @@ BWAPI::TilePosition	InformationManager::GetNextExpandLocation()
 	{
 		BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
 		{
+			/*
 			//check if it is not our base
 			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < 90)
 			{
 				continue;
-			}
+			}*/
 			//already expand
 			if (occupiedRegions[0].find(base->getRegion()) != occupiedRegions[0].end() || occupiedRegions[1].find(base->getRegion()) != occupiedRegions[1].end())
 			{
 				continue;
 			}
-			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest )
+			if (base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation)) < closest && !base->isIsland())
 			{
 				closest = base->getGroundDistance(BWTA::getNearestBaseLocation(selfStartBaseLocation));
 				nextBase = base->getTilePosition();
@@ -344,6 +413,82 @@ BWAPI::TilePosition	InformationManager::getOurNatrualLocation()
 }
 
 
+BWAPI::TilePosition	InformationManager::getSunkenBuildingPosition()
+{
+	//generate selfNaturalChokePoint
+	getOurNatrualLocation();
+
+	if (selfOccupiedDetail.find(BWTA::getRegion(selfNaturalBaseLocation)) == selfOccupiedDetail.end() && baseSunkenBuildingPosition != BWAPI::TilePositions::None)
+	{
+		return baseSunkenBuildingPosition;
+	}
+	if (selfOccupiedDetail.find(BWTA::getRegion(selfNaturalBaseLocation)) != selfOccupiedDetail.end() && natrualSunkenBuildingPosition != BWAPI::TilePositions::None)
+	{
+		return natrualSunkenBuildingPosition;
+	}
+
+
+	if (selfOccupiedDetail.find(BWTA::getRegion(selfNaturalBaseLocation)) == selfOccupiedDetail.end())
+	{
+		BWAPI::Position baseChoke = BWTA::getNearestChokepoint(BWAPI::Broodwar->self()->getStartLocation())->getCenter();
+		double2 direc = baseChoke - BWAPI::Position(selfStartBaseLocation);
+		double2 direcNormal = direc / direc.len();
+
+		/*
+		BWAPI::Position desireLocation = BWAPI::Position(selfStartBaseLocation);
+		while (desireLocation.getDistance(baseChoke) > 32 * 4)
+		{
+			if (BWAPI::Broodwar->hasCreep(desireLocation.x() / 32, desireLocation.y() / 32))
+			{
+				int targetx = desireLocation.x() + int(direcNormal.x * 32 * 1);
+				int targety = desireLocation.y() + int(direcNormal.y * 32 * 1);
+				desireLocation = BWAPI::Position(targetx, targety);
+			}
+			else
+				break;
+		}
+
+		//int targetx = BWAPI::Position(selfStartBaseLocation).x() + int(direcNormal.x * 32 * 8);
+		//int targety = BWAPI::Position(selfStartBaseLocation).y() + int(direcNormal.y * 32 * 8);
+
+		baseSunkenBuildingPosition = BWAPI::TilePosition(desireLocation.x() / 32, desireLocation.y() / 32);*/
+
+		int targetx = BWAPI::Position(selfStartBaseLocation).x() + int(direcNormal.x * 32 * 8);
+		int targety = BWAPI::Position(selfStartBaseLocation).y() + int(direcNormal.y * 32 * 8);
+
+		baseSunkenBuildingPosition = BWAPI::TilePosition(targetx / 32, targety / 32);
+		return baseSunkenBuildingPosition;
+	}
+	else
+	{
+		double2 direc = selfNaturalChokePoint - BWAPI::Position(selfNaturalBaseLocation);
+		double2 direcNormal = direc / direc.len();
+
+		BWAPI::Position desireLocation = BWAPI::Position(selfNaturalBaseLocation);
+		while (desireLocation.getDistance(selfNaturalChokePoint) > 32 * 2)
+		{
+			if (BWAPI::Broodwar->hasCreep(desireLocation.x() / 32, desireLocation.y() / 32))
+			{
+				int targetx = desireLocation.x() + int(direcNormal.x * 32 * 1);
+				int targety = desireLocation.y() + int(direcNormal.y * 32 * 1);
+				desireLocation = BWAPI::Position(targetx, targety);
+			}
+			else
+				break;
+		}
+
+		//int targetx = BWAPI::Position(selfNaturalBaseLocation).x() + int(direcNormal.x * 32 * 8);
+		//int targety = BWAPI::Position(selfNaturalBaseLocation).y() + int(direcNormal.y * 32 * 8);
+
+		natrualSunkenBuildingPosition = BWAPI::TilePosition(desireLocation.x() / 32, desireLocation.y() / 32);
+		return natrualSunkenBuildingPosition;
+	}
+
+	return BWAPI::TilePositions::None;
+}
+
+
+
 void InformationManager::setLocationEnemyBase(BWAPI::TilePosition Here)
 {
 	enemyStartBaseLocation = Here;
@@ -377,7 +522,6 @@ void InformationManager::onUnitMorph(BWAPI::Unit * unit)
  	updateUnit(unit);
 }
 
- 
 
 void InformationManager::updateEnemyUnitInfluenceMap()
 {
@@ -388,13 +532,15 @@ void InformationManager::updateEnemyUnitInfluenceMap()
 		{
 			enemyInfluenceMap[i][j].enemyUnitAirForce = 0;
 			enemyInfluenceMap[i][j].enemyUnitGroundForce = 0;
+			enemyInfluenceMap[i][j].enemyUnitDecayAirForce = 0;
+			enemyInfluenceMap[i][j].enemyUnitDecayGroundForce = 0;
 			
 			if (int(enemyInfluenceMap[i][j].airForce) != 0 || int(enemyInfluenceMap[i][j].decayAirForce) != 0)
 			{
 				if (int(enemyInfluenceMap[i][j].airForce) != 0)
 					BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].airForce));
-				else
-					BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].decayAirForce));
+				//else
+					//BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].decayAirForce));
 			}
 		}
 	}
@@ -404,57 +550,71 @@ void InformationManager::updateEnemyUnitInfluenceMap()
 		if (!enemy->getType().isBuilding() && enemy->getType().canAttack() && !enemy->getType().isWorker())
 		{
 			int attackRange = 0;
-			int airDamage = 0;
-			int groundDamage = 0;
-			int buildingWidth = enemy->getType().tileWidth();
-			int buildingHeight = enemy->getType().tileHeight();
-			int maxSize = buildingWidth > buildingHeight ? buildingWidth / 2 : buildingHeight / 2;
-
 			if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
+				attackRange = (enemy->getType().groundWeapon().maxRange() / 32) + 2;
+			else
+				attackRange = (enemy->getType().airWeapon().maxRange() / 32) + 2;
+			
+			int y_start = enemy->getTilePosition().y() - attackRange > 0 ? enemy->getTilePosition().y() - attackRange : 0;
+			int y_end = enemy->getTilePosition().y() + attackRange > BWAPI::Broodwar->mapHeight() - 1 ? BWAPI::Broodwar->mapHeight() - 1 : enemy->getTilePosition().y() + attackRange;
+			
+			int x_start = enemy->getTilePosition().x() - attackRange > 0 ? enemy->getTilePosition().x() - attackRange : 0;
+			int x_end = enemy->getTilePosition().x() + attackRange > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : enemy->getTilePosition().x() + attackRange;
+			
+			for (int i = x_start; i <= x_end; i++)
 			{
-				attackRange = (enemy->getType().groundWeapon().maxRange() / 32) + maxSize + 1;
-				groundDamage = enemy->getType().groundWeapon().damageAmount();
+				for (int j = y_start; j <= y_end; j++)
+				{
+					if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
+						enemyInfluenceMap[i][j].enemyUnitGroundForce += enemy->getType().groundWeapon().damageAmount();
+					if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
+						enemyInfluenceMap[i][j].enemyUnitAirForce += enemy->getType().airWeapon().damageAmount();
+				}
 			}
-			if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
-			{
-				attackRange = (enemy->getType().airWeapon().maxRange() / 32) + maxSize + 1;
-				airDamage = enemy->getType().airWeapon().damageAmount();
-			}
+		}
+	}
 
-			double2 initPosition(enemy->getTilePosition().x() + buildingWidth / 2, enemy->getTilePosition().y() + buildingHeight / 2);
-			double2 normalLength = double2(1, 0);
-			std::set<BWAPI::TilePosition> alreadySetPosition;
-			int startDegree = 0;
+			/*
+			int decayRange = 4;
+			startDegree = 0;
+			double decayGroundValue = 0;
+			double decayAirValue = 0;
 			while (startDegree < 360)
 			{
 				double2 rotateNormal(normalLength.rotateReturn(startDegree));
-				for (int length = 1; length <= attackRange; length++)
+				for (int length = attackRange + 1; length <= attackRange + decayRange; length++)
 				{
+					if (groundDamage > 0)
+						decayGroundValue = groundDamage * (decayRange - (length - attackRange)) / double(decayRange);
+					if (airDamage > 0)
+						decayAirValue = airDamage * (decayRange - (length - attackRange)) / double(decayRange);
 					double2 rotateVector(rotateNormal * length + initPosition);
 					BWAPI::TilePosition tmp(int(rotateVector.x), int(rotateVector.y));
 					if (int(tmp.x()) >= 0 && int(tmp.x()) < BWAPI::Broodwar->mapWidth() && int(tmp.y()) >= 0 && int(tmp.y()) < BWAPI::Broodwar->mapHeight()
 						&& alreadySetPosition.find(tmp) == alreadySetPosition.end())
 					{
 						alreadySetPosition.insert(tmp);
-						if (enemy->getType().groundWeapon() != BWAPI::WeaponTypes::None)
-							enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitGroundForce += groundDamage;
-						if (enemy->getType().airWeapon() != BWAPI::WeaponTypes::None)
-							enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitAirForce += airDamage;
+						enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitDecayGroundForce += decayGroundValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].enemyUnitDecayAirForce += decayAirValue;
 					}
 				}
 				startDegree += 5;
-			}
-		}
-	}
-	/*
+			}*/
+
+	
 	for (int i = 0; i < BWAPI::Broodwar->mapWidth(); i++)
 	{
 		for (int j = 0; j < BWAPI::Broodwar->mapHeight(); j++)
 		{
-			if (enemyInfluenceMap[i][j].enemyUnitAirForce > 0)
-				BWAPI::Broodwar->drawTextMap(j * 32, i * 32, "%d", int(enemyInfluenceMap[i][j].enemyUnitGroundForce));
+			if (int(enemyInfluenceMap[i][j].enemyUnitGroundForce) != 0 || int(enemyInfluenceMap[i][j].enemyUnitDecayGroundForce) != 0)
+			{
+				if (int(enemyInfluenceMap[i][j].enemyUnitGroundForce) != 0)
+					BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].enemyUnitGroundForce));
+				//else
+					//BWAPI::Broodwar->drawTextMap(i * 32, j * 32, "%d", int(enemyInfluenceMap[i][j].enemyUnitDecayGroundForce));
+			}
 		}
-	}*/
+	}
 }
 
 
@@ -482,7 +642,7 @@ void InformationManager::addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestr
 
 		if (unit->getType() == BWAPI::UnitTypes::Terran_Bunker)
 		{
-			attackRange = (BWAPI::UnitTypes::Terran_Marine.groundWeapon().maxRange() / 32) + maxSize + 1;
+			attackRange = (BWAPI::UnitTypes::Terran_Marine.groundWeapon().maxRange() / 32) + maxSize + 2;
 			groundDamage = BWAPI::UnitTypes::Terran_Marine.groundWeapon().damageAmount() * 4;
 			airDamage = BWAPI::UnitTypes::Terran_Marine.airWeapon().damageAmount() * 4;
 		}
@@ -533,12 +693,17 @@ void InformationManager::addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestr
 		
 		int decayRange = 4;
 		startDegree = 0;
+		double decayGroundValue = 0;
+		double decayAirValue = 0;
 		while (startDegree < 360)
 		{
 			double2 rotateNormal(normalLength.rotateReturn(startDegree));
 			for (int length = attackRange + 1; length <= attackRange + decayRange; length++)
 			{
-				double decayValue = (decayRange - (length - attackRange)) / double(decayRange);
+				if (groundDamage > 0)
+					decayGroundValue = groundDamage * (decayRange - (length - attackRange)) / double(decayRange);
+				if (airDamage > 0)
+					decayAirValue = airDamage * (decayRange - (length - attackRange)) / double(decayRange);
 				double2 rotateVector(rotateNormal * length + initPosition);
 				BWAPI::TilePosition tmp(int(rotateVector.x), int(rotateVector.y));
 				if (int(tmp.x()) >= 0 && int(tmp.x()) < BWAPI::Broodwar->mapWidth() && int(tmp.y()) >= 0 && int(tmp.y()) < BWAPI::Broodwar->mapHeight()
@@ -547,13 +712,13 @@ void InformationManager::addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestr
 					alreadySetPosition.insert(tmp);
 					if (addOrdestroy)
 					{
-						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce += decayValue;
-						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce += decayValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce += decayGroundValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce += decayAirValue;
 					}
 					else
 					{
-						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce -= decayValue;
-						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce -= decayValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayGroundForce -= decayGroundValue;
+						enemyInfluenceMap[tmp.x()][tmp.y()].decayAirForce -= decayAirValue;
 					}
 				}
 			}
@@ -570,7 +735,7 @@ void InformationManager::updateUnit(BWAPI::Unit * unit)
 	{
 		if (unit->getType().isBuilding())
 		{
-			if (unit->getType().canAttack() && !unit->isCompleted())
+			if ((unit->getType().canAttack() || unit->getType() == BWAPI::UnitTypes::Terran_Bunker) && !unit->isCompleted())
 				return;
 
 			addUnitInfluenceMap(unit, true);
@@ -621,12 +786,17 @@ void InformationManager::updateUnit(BWAPI::Unit * unit)
 			{
 				BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
 				{
-					if (base->getTilePosition().getDistance(unit->getTilePosition()) < 5)
+					if (base->getTilePosition().getDistance(unit->getTilePosition()) < 3)
 					{
 						selfAllBase.insert(unit);
 						break;
 					}
 				}
+			}
+
+			if (unit->getType() == BWAPI::UnitTypes::Zerg_Sunken_Colony && waitToBuildSunker > 0)
+			{
+				waitToBuildSunker--;
 			}
 
 			if (selfAllBuilding.find(unit->getType()) == selfAllBuilding.end())
@@ -657,9 +827,6 @@ void InformationManager::onUnitDestroy(BWAPI::Unit * unit)
 	{
 		if (unit->getType().isBuilding())
 		{
-			if (unit->getType().canAttack() && !unit->isCompleted())
-				return;
-
 			addUnitInfluenceMap(unit, false);
 
 			destroyOccupiedRegionsDetail(BWTA::getRegion(unit->getPosition()), BWAPI::Broodwar->enemy(), unit);
@@ -696,8 +863,15 @@ void InformationManager::onUnitDestroy(BWAPI::Unit * unit)
 				BOOST_FOREACH(BWTA::BaseLocation* base, BWTA::getBaseLocations())
 				{
 					//check if it is not our base
-					if (base->getTilePosition().getDistance(unit->getTilePosition()) < 5)
+					if (base->getTilePosition().getDistance(unit->getTilePosition()) < 3)
 					{
+						//for ucb1 simulation
+						if (BWTA::getRegion(unit->getTilePosition()) == BWTA::getRegion(getOurNatrualLocation())
+							&& BWAPI::Broodwar->getFrameCount() < 7000)
+						{
+							enemyEarlyRushSuccess = true;
+						}
+
 						selfAllBase.erase(unit);
 						break;
 					}
@@ -797,10 +971,17 @@ void InformationManager::destroyOccupiedRegionsDetail(BWTA::Region * region, BWA
 		if (player == BWAPI::Broodwar->self())
 		{
 			if (selfOccupiedDetail.find(region) != selfOccupiedDetail.end())
-			{
+			{	
 				selfOccupiedDetail[region].erase(building);
 				if (selfOccupiedDetail[region].size() == 0)
 				{
+					occupiedRegions[0].erase(region);
+					selfOccupiedDetail.erase(region);
+				}
+
+				if (selfOccupiedDetail[region].size() == 1 && (*selfOccupiedDetail[region].begin()).second.unitType.isRefinery())
+				{
+					selfOccupiedDetail[region].erase(selfOccupiedDetail[region].begin());
 					occupiedRegions[0].erase(region);
 					selfOccupiedDetail.erase(region);
 				}
@@ -815,8 +996,14 @@ void InformationManager::destroyOccupiedRegionsDetail(BWTA::Region * region, BWA
 				{
 					occupiedRegions[1].erase(region);
 					enemyOccupiedDetail.erase(region);
+				} 
+
+				if (enemyOccupiedDetail[region].size() == 1 && (*enemyOccupiedDetail[region].begin()).second.unitType.isRefinery())
+				{
+					enemyOccupiedDetail[region].erase(enemyOccupiedDetail[region].begin());
+					occupiedRegions[1].erase(region);
+					enemyOccupiedDetail.erase(region);
 				}
-					
 			}
 		}
 	}
@@ -826,7 +1013,16 @@ void InformationManager::destroyOccupiedRegionsDetail(BWTA::Region * region, BWA
 std::set<BWTA::Region *> & InformationManager::getOccupiedRegions(BWAPI::Player * player)
 {
 	if (player == BWAPI::Broodwar->self())
+	{
+		//use the base as occupied flag
+		occupiedRegions[0].clear();
+		BOOST_FOREACH(BWAPI::Unit* base, selfAllBase)
+		{
+			occupiedRegions[0].insert(BWTA::getRegion(base->getPosition()));
+		}
 		return occupiedRegions[0];
+	}
+		
 	else
 		return occupiedRegions[1];
 }

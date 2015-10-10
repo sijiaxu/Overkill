@@ -16,7 +16,7 @@ struct EnemyUnit
 		distance = d;
 	}
 
-	bool operator < (const EnemyUnit& u)
+	bool operator < (const EnemyUnit& u) const
 	{
 		if (priority < u.priority)
 			return true;
@@ -33,6 +33,27 @@ struct EnemyUnit
 		}
 	}
 };
+
+struct unitDistance
+{
+	BWAPI::Unit* unit;
+	int distance;
+
+	unitDistance(BWAPI::Unit* u, int d)
+	{
+		unit = u;
+		distance = d;
+	}
+
+	bool operator < (const unitDistance & u)
+	{
+		if (distance < u.distance)
+			return true;
+		else
+			return false;
+	}
+};
+
 
 
 class BattleArmy
@@ -55,6 +76,7 @@ public:
 	bool						reGroup(const BWAPI::Position & regroupPosition);
 
 	bool						preciseReGroup(const BWAPI::Position & regroupPosition);
+	bool						isInDanger(BWAPI::Unit* u);
 
 };
 

@@ -100,5 +100,6 @@ public:
 
 	int						getWokringDepotCount();
 	int						getWorkingRefineryCount(BWAPI::Unit* worker) { return refineryWorkerCount[workerRefineryMap[worker]]; }
-
+	BWAPI::Unit*			getMineralWorkerMine(BWAPI::Unit* worker) { return workerMineralAssignment[worker]; }
+	BWAPI::Unit*			getGasWorkerRefinery(BWAPI::Unit* worker) { return workerRefineryMap[worker]; }
 };

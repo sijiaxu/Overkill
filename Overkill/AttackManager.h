@@ -18,22 +18,19 @@ struct AttackEnemyBase
 	BWAPI::Position base;
 	bool nowAttacking;
 	int priority;
-	int nextAttackTime;
+	int groundNextAttackTime;
+	int airNextAttackTime;
 
 	AttackEnemyBase(BWAPI::Position b, int p)
 	{
 		base = b;
 		priority = p;
-		nextAttackTime = 0;
+		groundNextAttackTime = 0;
+		airNextAttackTime = 0;
 		nowAttacking = false;
 	}
 
-	void resetAttackTime()
-	{
-		nextAttackTime = BWAPI::Broodwar->getFrameCount() + 25 * 90;
-	}
-
-	bool operator < (const AttackEnemyBase& u)
+	bool operator < (const AttackEnemyBase& u) const
 	{
 		if (priority < u.priority)
 			return true;
@@ -48,14 +45,16 @@ class AttackManager{
 	std::map<BWAPI::UnitType, BattleArmy*>	myArmy;
 
 	std::vector<AttackEnemyBase>			attackPosition;
-	void					updateAttackPosition();
+	BWAPI::Position							lastAttackPosition;
 	int						updatPositionTime;
+	int						defendAddSupply;
 
 	AttackManager();
 	bool					triggerZerglingBuilding;
 
 	bool					isNeedDefend;
 	bool					isNeedTacticDefend;
+	bool					hasWorkerScouter;
 
 	bool					zerglingHarassFlag;
 	std::vector<BWAPI::Unit*> unRallyArmy;
@@ -72,10 +71,16 @@ class AttackManager{
 	void					DefendEnemy(std::set<BWAPI::Unit *>& enemyUnitsInRegion, int enemyTotalSupply);
 	void					DefendOver();
 	void					DefendUpdate();
-	void					DefendProductionStrategy(unsigned enemyTotalSupply);
+	void					DefendProductionStrategy(int myTotalArmySupply, int enemyTotalSupply);
 
-	BWAPI::Position			generateAttackPosition();
-	bool					tacticTrigCondition(int tac);
+	void					popAttackPosition(BWAPI::Position popPosition);
+	BWAPI::Position			getNextAttackPosition(bool isGround);
+	bool					tacticTrigCondition(int tac, BWAPI::Position attackPosition);
+	void					triggerTactic(tacticType tacType, BWAPI::Position attackPosition);
+
+	int						addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, bool addAll = false);
+	bool					isFirstMutaAttack;
+	bool					isFirstHydraAttack;
 
 public:
 	
@@ -84,7 +89,7 @@ public:
 	void					onUnitDestroy(BWAPI::Unit * unit);
 	void					onEnemyUnitDestroy(BWAPI::Unit* unit);
 
-	void					addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy, BWAPI::Position attackTarget);
+	void					addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy, tacticType tacType, BWAPI::Position attackTarget, bool endByDefend);
 	bool					isNeedRetreatDefend() { return isNeedTacticDefend; }
 	bool					isUnderAttack() { return isNeedDefend; }
 	

@@ -10,25 +10,30 @@ bool BattleTactic::reGroup(BWAPI::Position & regroupPosition) const
 	bool isGroup = true;
 	BOOST_FOREACH(mapType p, tacticArmy)
 	{
+		if (p.second->getUnits().size() == 0)
+			continue;
 		if (!p.second->reGroup(regroupPosition))
 			isGroup = false;
 	}
 	return isGroup;
 }
 
+
 bool BattleTactic::hasEnemy()
 {
-
-	
 	if (!BWAPI::Broodwar->isVisible(BWAPI::TilePosition(attackPosition)))
 		return true;
 
+	// if current attack position has target, do not change original attack position
 	std::set<BWAPI::Unit*>& units = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 8 * 32);
 	bool needAttack = false;
 	BOOST_FOREACH(BWAPI::Unit* u, units)
 	{
-		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition))
+		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition) && u->getType() != BWAPI::UnitTypes::Protoss_Observer)
 		{
+			if (u->getType().isFlyer() && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
 			needAttack = true;
 			break;
 		}
@@ -42,8 +47,15 @@ bool BattleTactic::hasEnemy()
 		{
 			std::map<BWAPI::Unit*, buildingInfo >& tmp = occupiedDetail[BWTA::getRegion(attackPosition)];
 
-			attackPosition = BWAPI::Position((*tmp.begin()).second.initPosition);
-			needAttack = true;
+			for (std::map<BWAPI::Unit*, buildingInfo >::iterator it = tmp.begin(); it != tmp.end(); it++)
+			{
+				if ((!it->second.unitType.isRefinery() && tmp.size() > 1) ||
+					(tmp.size() == 1))
+				{
+					attackPosition = BWAPI::Position(it->second.initPosition);
+					return true;
+				}
+			}
 		}
 	}
 
@@ -87,11 +99,7 @@ void BattleTactic::newArmyRally()
 			}
 		}
 		else
-		{
-			it->first->move(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
-			tacticArmy[it->first->getType()]->addUnit(it->first);
-			newAddArmy.erase(it++);
-		}
+			it++;
 	}
 }
 
@@ -102,6 +110,8 @@ BattleTactic::BattleTactic()
 	tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk] = new MutaliskArmy();
 	tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk] = new HydraliskArmy();
 	tacticArmy[BWAPI::UnitTypes::Zerg_Overlord] = new OverLordArmy();
+
+	endByDefend = false;
 }
 
 BattleTactic::~BattleTactic()

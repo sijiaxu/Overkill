@@ -24,6 +24,8 @@ class WorkerManager {
 
 	WorkerManager();
 
+	void						handleWorkerReact();
+
 public:
 
 	void						update();
@@ -32,6 +34,7 @@ public:
 	void						onUnitMorph(BWAPI::Unit * unit);
 	void						onUnitShow(BWAPI::Unit * unit);
 	void						onUnitRenegade(BWAPI::Unit * unit);
+	void						addWoker(BWAPI::Unit* unit) { workerData.addWorker(unit); }
 	void						finishedWithWorker(BWAPI::Unit * unit);
 
 	void						handleIdleWorkers();

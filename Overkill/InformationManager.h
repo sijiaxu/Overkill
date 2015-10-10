@@ -4,6 +4,7 @@
 #include "BuildingData.h"
 #include "WorkerManager.h"
 #include "ProductionManager.h"
+#include "StrategyManager.h"
 
 
 //gather enemy building/unit/base and self building/unit/base info
@@ -40,6 +41,9 @@ struct gridInfo
 
 	double enemyUnitAirForce;
 	double enemyUnitGroundForce;
+
+	double enemyUnitDecayAirForce;
+	double enemyUnitDecayGroundForce;
 	gridInfo()
 	{
 		airForce = 0;
@@ -50,6 +54,9 @@ struct gridInfo
 
 		enemyUnitAirForce = 0;
 		enemyUnitGroundForce = 0;
+
+		enemyUnitDecayAirForce = 0;
+		enemyUnitDecayGroundForce = 0;
 	}
 };
 
@@ -84,7 +91,6 @@ class InformationManager {
 	//first Creep_Colony location
 	BWAPI::TilePosition					firstColonyLocation;
 
-
 	void							updateUnit(BWAPI::Unit * unit);
 	bool							defendTrig;
 	bool							depotBalanceFlag;
@@ -107,10 +113,26 @@ class InformationManager {
 
 	void							checkVeryEarlyRush();
 	bool							earlyRush;
+
+	void							checkEarlyRushDefend();
+	int								defendAddSupply;
 	
 	std::vector<std::vector<gridInfo>>			enemyInfluenceMap;
 	void							addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestroy);
 	void							updateEnemyUnitInfluenceMap();
+
+	int								waitToBuildSunker;
+
+	BWAPI::TilePosition				baseSunkenBuildingPosition;
+	BWAPI::TilePosition				natrualSunkenBuildingPosition;
+
+	bool							enemyEarlyRushSuccess;
+	void							checkAirDrop();
+	bool							airDropTrigger;
+
+	void							checkAirDefend();
+	bool							airDefendTrigger;
+	bool							chamberTrigger;
 
 public:
 	void							setLocationEnemyBase(BWAPI::TilePosition Here);
@@ -140,6 +162,10 @@ public:
 
 	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& getEnemyOccupiedDetail() { return enemyOccupiedDetail; }
 	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& getSelfOccupiedDetail() { return selfOccupiedDetail; }
+
+	BWAPI::TilePosition				getSunkenBuildingPosition();
+	void							addWaitBuildSunkun(int count) { waitToBuildSunker += count; }
+	bool							getEnemyEarlyRushSuccess() { return enemyEarlyRushSuccess; }
 
 	void							onUnitShow(BWAPI::Unit * unit);
 	void							onUnitMorph(BWAPI::Unit * unit);

@@ -6,37 +6,27 @@
 #include "AttackManager.h"
 
 
-struct hydrliskDistance
-{
-	BWAPI::Unit* unit;
-	int distance;
 
-	hydrliskDistance(BWAPI::Unit* u, int d)
-	{
-		unit = u;
-		distance = d;
-	}
-
-	bool operator < (const hydrliskDistance& u)
-	{
-		if (distance < u.distance)
-			return true;
-		else
-			return false;
-	}
-};
 
 class HydraliskTactic : public BattleTactic
 {
 	BWAPI::Position			movePosition;
 	int						mutaliskAttackTime;
 
+	std::set<BWAPI::Unit*>				nearbyUnits;
+	std::set<BWAPI::Unit*>				nearbySunkens;
+	std::set<BWAPI::Unit*>				friendUnitNearBy;
+	int									nextAttackTime;
+	int									retreatTime;
+	BWAPI::Position						nextRetreatPosition;
+
+	int									retreatCount;
 public:
 	HydraliskTactic();
 
 	virtual void			update();
 	bool					isTacticEnd();
-
+	bool					needRetreat();
 	void					generateAttackPath();
 };
 

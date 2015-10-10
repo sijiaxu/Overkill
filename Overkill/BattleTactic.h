@@ -12,7 +12,7 @@ class BattleTactic
 {
 
 protected:
-	enum tacticState { GROUPARMY, LOCATIONASSIGN, MOVE, MOVEATTACK, ATTACK, RETREAT, WIN, END };
+	enum tacticState { GROUPARMY, LOCATIONASSIGN, MOVE, MOVEATTACK, ATTACK, RETREAT, BACKLOCATIONASSIGN, BACKMOVE, WAIT, WIN, END};
 	tacticState							state;
 
 	std::map<BWAPI::UnitType, BattleArmy*>	tacticArmy;
@@ -21,6 +21,7 @@ protected:
 
 	std::map<BWAPI::Unit*, std::vector<BWAPI::Position>> newAddArmy;
 	std::vector<BWAPI::Position> 			newAddMovePositions;
+	bool									endByDefend;
 
 public:
 	BattleTactic();
@@ -33,10 +34,11 @@ public:
 	virtual void		setAttackPosition(BWAPI::Position targetPosition) { attackPosition = originAttackBase = targetPosition; }
 	virtual bool		hasEnemy();
 
-	void				addArmyUnit(BWAPI::Unit* unit) { newAddArmy[unit] = newAddMovePositions; }
+	virtual void		addArmyUnit(BWAPI::Unit* unit) { newAddArmy[unit] = newAddMovePositions; }
 	void				addAllNewArmy();
 	void				newArmyRally();
-	
+	void				setDefendEnd() { endByDefend = true; }
+	bool				getDefendEnd() { return endByDefend; }
 
 	bool				reGroup(BWAPI::Position & regroupPosition) const;
 	bool				unitNearChokepoint(BWAPI::Unit * unit) const;
