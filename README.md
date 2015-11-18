@@ -10,4 +10,5 @@ besides, it now has three zerg tactics: zergling rush, mutalisk rush and hydrali
 
 ###Competition Results
 CIG 2015: 3rd
+AIIDE 2015: 3rd
 
