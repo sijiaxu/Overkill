@@ -72,7 +72,7 @@ void ArmyDefendTactic::update()
 	std::set<EnemyUnit> enemyUnitsInRegion;
 	int enemyInRegionSupply = 0;
 	int enemyAntiAirSupply = 0;
-	BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
 	{
 		if (reachRegions.find(BWTA::getRegion(enemyUnit->getPosition())) != reachRegions.end()) //(BWTA::getRegion(enemyUnit->getPosition()) == BWTA::getRegion(attackPosition))
 		{
@@ -90,13 +90,13 @@ void ArmyDefendTactic::update()
 	}
 	
 	//get unit near our sunken defend and unit in range to decide when to attack
-	std::set<BWAPI::Unit*> sunkens;
-	std::set<BWAPI::Unit*> sunkenNearbyEnemy;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
+	std::set<BWAPI::Unit> sunkens;
+	std::set<BWAPI::Unit> sunkenNearbyEnemy;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
 	int sunkunRange = BWAPI::UnitTypes::Zerg_Sunken_Colony.groundWeapon().maxRange();
 	int minDistance = 99999;
-	BWAPI::Unit* minDistanceSunker = NULL;
-	BOOST_FOREACH(BWAPI::Unit* sunker, myBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony])
+	BWAPI::Unit minDistanceSunker = NULL;
+	BOOST_FOREACH(BWAPI::Unit sunker, myBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony])
 	{
 		if (reachRegions.find(BWTA::getRegion(sunker->getPosition())) != reachRegions.end()) //(BWTA::getRegion(sunker->getPosition()) == BWTA::getRegion(attackPosition))
 		{
@@ -111,10 +111,10 @@ void ArmyDefendTactic::update()
 
 	if (minDistanceSunker != NULL)
 	{
-		std::set<BWAPI::Unit*> tmp = minDistanceSunker->getUnitsInRadius(sunkunRange);
-		BWAPI::Broodwar->drawCircleMap(minDistanceSunker->getPosition().x(), minDistanceSunker->getPosition().y(), 8 * 32, BWAPI::Colors::Green, false);
+		BWAPI::Unitset tmp = minDistanceSunker->getUnitsInRadius(sunkunRange);
+		BWAPI::Broodwar->drawCircleMap(minDistanceSunker->getPosition().x, minDistanceSunker->getPosition().y, 8 * 32, BWAPI::Colors::Green, false);
 
-		BOOST_FOREACH(BWAPI::Unit* enemy, tmp)
+		BOOST_FOREACH(BWAPI::Unit enemy, tmp)
 		{
 			if (enemy->getType().isFlyer() && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
 				&& tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
@@ -125,23 +125,23 @@ void ArmyDefendTactic::update()
 		}
 	}
 
-	std::set<BWAPI::Unit*> unitsInCircle;
-	std::set<BWAPI::Unit*> enemyInCircle;
+	BWAPI::Unitset unitsInCircle;
+	BWAPI::Unitset enemyInCircle;
 	//if has sunken, only care about enemy around base
 	if (sunkens.size() > 0)
 	{
 		unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 8 * 32);
-		BWAPI::Broodwar->drawCircleMap(attackPosition.x(), attackPosition.y(), 6 * 32, BWAPI::Colors::Green, false);
+		BWAPI::Broodwar->drawCircleMap(attackPosition.x, attackPosition.y, 6 * 32, BWAPI::Colors::Green, false);
 	}
 	else
 	{
 		unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 12 * 32);
-		BWAPI::Broodwar->drawCircleMap(attackPosition.x(), attackPosition.y(), 12 * 32, BWAPI::Colors::Green, false);
+		BWAPI::Broodwar->drawCircleMap(attackPosition.x, attackPosition.y, 12 * 32, BWAPI::Colors::Green, false);
 	}
 		
 	
 
-	BOOST_FOREACH(BWAPI::Unit* enemy, unitsInCircle)
+	BOOST_FOREACH(BWAPI::Unit enemy, unitsInCircle)
 	{
 		if (enemy->getPlayer() == BWAPI::Broodwar->enemy() && reachRegions.find(BWTA::getRegion(enemy->getPosition())) != reachRegions.end())
 		{

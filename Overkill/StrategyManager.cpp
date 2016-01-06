@@ -105,7 +105,7 @@ void StrategyManager::goalBuildingOrderInit()
 
 const std::vector<MetaType>& StrategyManager::getCurrentGoalBuildingOrder()
 {
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 
 	if ((currentStrategy == HydraPush || currentStrategy == MutaPush)
 		&& BWAPI::Broodwar->self()->minerals() > 500 && BWAPI::Broodwar->self()->gas() < 200 
@@ -125,7 +125,7 @@ const std::vector<MetaType>& StrategyManager::getCurrentGoalBuildingOrder()
 
 void StrategyManager::goalChange(zergStrategy changeStrategy)
 {
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 
 	if (changeStrategy == HydraPush)
 	{
@@ -227,9 +227,9 @@ void StrategyManager::update()
 			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Attacks);
 		}
 		
-		std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
+		std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
 		int enemyAntiAirSupply = 0;
-		for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>::iterator it = enemyBattle.begin(); it != enemyBattle.end(); it++)
+		for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>::iterator it = enemyBattle.begin(); it != enemyBattle.end(); it++)
 		{
 			if (it->first.airWeapon() != BWAPI::WeaponTypes::None)
 			{
@@ -248,7 +248,7 @@ void StrategyManager::update()
 	case ZerglingPush:
 	{
 		int hatchCompleteCount = 0;
-		BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+		BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 		{
 			if (u->getType() == BWAPI::UnitTypes::Zerg_Hatchery && u->isCompleted())
 			{
@@ -326,7 +326,7 @@ std::vector<MetaType> StrategyManager::getOpeningBook()
 }
 
 
-int StrategyManager::getScore(BWAPI::Player * player)
+int StrategyManager::getScore(BWAPI::Player player)
 {
 	return player->getBuildingScore() + player->getKillScore() + player->getRazingScore() + player->getUnitScore();
 }

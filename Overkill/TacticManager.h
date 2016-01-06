@@ -48,9 +48,9 @@ class TacticManager
 public:
 	
 	void				update();
-	void				onUnitDestroy(BWAPI::Unit * unit);
+	void				onUnitDestroy(BWAPI::Unit unit);
 	void				addTactic(tacticType tactic, BWAPI::Position attackPosition);
-	void				addTacticUnit(tacticType tactic, BWAPI::Position attackPosition, BWAPI::Unit * unit);
+	void				addTacticUnit(tacticType tactic, BWAPI::Position attackPosition, BWAPI::Unit unit);
 	void				addTacticArmy(tacticType tactic, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, BWAPI::UnitType unitType, int count);
 
 	bool				isTacticRun(tacticType tactic, BWAPI::Position attackPosition);
@@ -63,7 +63,7 @@ public:
 	int					getTacArmyForce(tacticType tactic, BWAPI::Position attackPosition);
 	void				assignDefendArmy(BWAPI::Position defendPosition, int needSupply);
 
-	void				onUnitShow(BWAPI::Unit* unit);
+	void				onUnitShow(BWAPI::Unit unit);
 
 private:
 	TacticManager() {}

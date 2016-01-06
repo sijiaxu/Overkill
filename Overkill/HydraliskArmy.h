@@ -9,5 +9,5 @@ public:
 	HydraliskArmy() {}
 	void defend(BWAPI::Position targetPosition);
 	void attack(BWAPI::Position targetPosition);
-	int getAttackPriority(BWAPI::Unit * unit);
+	int getAttackPriority(BWAPI::Unit unit);
 };

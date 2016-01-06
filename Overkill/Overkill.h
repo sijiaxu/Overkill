@@ -56,16 +56,16 @@ public:
 	void	onStart();
 	void	onFrame();
 	void	onEnd(bool isWinner);
-	void	onUnitDestroy(BWAPI::Unit * unit);
-	void	onUnitMorph(BWAPI::Unit * unit);
+	void	onUnitDestroy(BWAPI::Unit unit);
+	void	onUnitMorph(BWAPI::Unit unit);
 	void	onSendText(std::string text);
-	void	onUnitCreate(BWAPI::Unit * unit);
-	void	onUnitShow(BWAPI::Unit * unit);
-	void	onUnitHide(BWAPI::Unit * unit);
+	void	onUnitCreate(BWAPI::Unit unit);
+	void	onUnitShow(BWAPI::Unit unit);
+	void	onUnitHide(BWAPI::Unit unit);
 	void    onNukeDetect(BWAPI::Position target);
-	void    onUnitComplete(BWAPI::Unit *unit);
-	void    onUnitDiscover(BWAPI::Unit* unit);
-	void	onUnitEvade(BWAPI::Unit* unit);
+	void    onUnitComplete(BWAPI::Unit unit);
+	void    onUnitDiscover(BWAPI::Unit unit);
+	void	onUnitEvade(BWAPI::Unit unit);
 
 	void    drawTerrainData();
 	void	drawStats(); //not part of BWAPI::AIModule

@@ -1,7 +1,7 @@
 #include "BattleArmy.h"
 
 
-void BattleArmy::addUnit(BWAPI::Unit* u)
+void BattleArmy::addUnit(BWAPI::Unit u)
 {
 	if (u == NULL)
 		return;
@@ -10,15 +10,15 @@ void BattleArmy::addUnit(BWAPI::Unit* u)
 }
 
 
-bool BattleArmy::isInDanger(BWAPI::Unit* u)
+bool BattleArmy::isInDanger(BWAPI::Unit u)
 {
 	if (!u->isUnderAttack())
 	{
 		return false;
 	}
 
-	std::set<BWAPI::Unit*>& enemyUnits = u->getUnitsInRadius(u->getType().sightRange());
-	BOOST_FOREACH(BWAPI::Unit* unit, enemyUnits)
+	BWAPI::Unitset enemyUnits = u->getUnitsInRadius(u->getType().sightRange());
+	BOOST_FOREACH(BWAPI::Unit unit, enemyUnits)
 	{
 		if (unit->getPlayer() == BWAPI::Broodwar->enemy() &&
 			!unit->getType().isBuilding())
@@ -29,7 +29,8 @@ bool BattleArmy::isInDanger(BWAPI::Unit* u)
 	return false;
 }
 
-void BattleArmy::smartAttackUnit(BWAPI::Unit * attacker, BWAPI::Unit * target) const
+
+void BattleArmy::smartAttackUnit(BWAPI::Unit attacker, BWAPI::Unit target) const
 {
 	if (attacker == NULL || target == NULL)
 		return;
@@ -52,13 +53,13 @@ void BattleArmy::smartAttackUnit(BWAPI::Unit * attacker, BWAPI::Unit * target) c
 	// if nothing prevents it, attack the target
 	attacker->attack(target);
 
-	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(attacker->getPosition().x(), attacker->getPosition().y(),
-		target->getPosition().x(), target->getPosition().y(),
+	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(attacker->getPosition().x, attacker->getPosition().y,
+		target->getPosition().x, target->getPosition().y,
 		BWAPI::Colors::Red);
 
 }
 
-void BattleArmy::smartAttackMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const
+void BattleArmy::smartAttackMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const
 {
 	assert(attacker);
 
@@ -80,12 +81,12 @@ void BattleArmy::smartAttackMove(BWAPI::Unit * attacker, BWAPI::Position targetP
 	// if nothing prevents it, attack the target
 	attacker->attack(targetPosition);
 
-	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(attacker->getPosition().x(), attacker->getPosition().y(),
-		targetPosition.x(), targetPosition.y(),
+	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(attacker->getPosition().x, attacker->getPosition().y,
+		targetPosition.x, targetPosition.y,
 		BWAPI::Colors::Orange);
 }
 
-void BattleArmy::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const
+void BattleArmy::smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const
 {
 	assert(attacker);
 
@@ -111,7 +112,7 @@ void BattleArmy::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPositio
 		if (attacker->isSelected())
 		{
 			return;
-			//BWAPI::Broodwar->printf("Previous Command Frame=%d Pos=(%d, %d)", attacker->getLastCommandFrame(), currentCommand.getTargetPosition().x(), currentCommand.getTargetPosition().y());
+			//BWAPI::Broodwar->printf("Previous Command Frame=%d Pos=(%d, %d)", attacker->getLastCommandFrame(), currentCommand.getTargetPosition().x, currentCommand.getTargetPosition().y);
 		}
 		return;
 	}
@@ -121,8 +122,8 @@ void BattleArmy::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPositio
 
 	if (Options::Debug::DRAW_UALBERTABOT_DEBUG)
 	{
-		BWAPI::Broodwar->drawLineMap(attacker->getPosition().x(), attacker->getPosition().y(),
-			targetPosition.x(), targetPosition.y(), BWAPI::Colors::Orange);
+		BWAPI::Broodwar->drawLineMap(attacker->getPosition().x, attacker->getPosition().y,
+			targetPosition.x, targetPosition.y, BWAPI::Colors::Orange);
 	}
 }
 

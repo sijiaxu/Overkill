@@ -5,11 +5,11 @@
 
 struct EnemyUnit
 {
-	BWAPI::Unit* unit;
+	BWAPI::Unit unit;
 	int priority;
 	int distance;
 
-	EnemyUnit(BWAPI::Unit* u, int p, int d)
+	EnemyUnit(BWAPI::Unit u, int p, int d)
 	{
 		unit = u;
 		priority = p;
@@ -36,10 +36,10 @@ struct EnemyUnit
 
 struct unitDistance
 {
-	BWAPI::Unit* unit;
+	BWAPI::Unit unit;
 	int distance;
 
-	unitDistance(BWAPI::Unit* u, int d)
+	unitDistance(BWAPI::Unit u, int d)
 	{
 		unit = u;
 		distance = d;
@@ -60,23 +60,23 @@ class BattleArmy
 {
 protected:
 	std::vector<UnitState>	units;
-	void						smartAttackUnit(BWAPI::Unit * attacker, BWAPI::Unit * target) const;
-	void						smartAttackMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const;
-	void						smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const;
+	void						smartAttackUnit(BWAPI::Unit attacker, BWAPI::Unit target) const;
+	void						smartAttackMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
+	void						smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
 
 public:
 	BattleArmy() { units.reserve(100); }
 	virtual void				defend(BWAPI::Position targetPosition) = 0;
 	virtual void				attack(BWAPI::Position priorityPosition) = 0;
 
-	void						addUnit(BWAPI::Unit* u);
+	void						addUnit(BWAPI::Unit u);
 	std::vector<UnitState>&		getUnits() { return units; }
 	void						armyAttackMove(BWAPI::Position targetPosition);
 	void						armyMove(BWAPI::Position targetPosition);
 	bool						reGroup(const BWAPI::Position & regroupPosition);
 
 	bool						preciseReGroup(const BWAPI::Position & regroupPosition);
-	bool						isInDanger(BWAPI::Unit* u);
+	bool						isInDanger(BWAPI::Unit u);
 
 };
 

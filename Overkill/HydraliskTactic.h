@@ -13,9 +13,9 @@ class HydraliskTactic : public BattleTactic
 	BWAPI::Position			movePosition;
 	int						mutaliskAttackTime;
 
-	std::set<BWAPI::Unit*>				nearbyUnits;
-	std::set<BWAPI::Unit*>				nearbySunkens;
-	std::set<BWAPI::Unit*>				friendUnitNearBy;
+	std::set<BWAPI::Unit>				nearbyUnits;
+	std::set<BWAPI::Unit>				nearbySunkens;
+	std::set<BWAPI::Unit>				friendUnitNearBy;
 	int									nextAttackTime;
 	int									retreatTime;
 	BWAPI::Position						nextRetreatPosition;

@@ -2,7 +2,7 @@
 #include "MutaliskHarassTactic.h"
 
 
-void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
+void MutaliskHarassTactic::onUnitShow(BWAPI::Unit unit)
 {
 	if (unit->getPlayer() == BWAPI::Broodwar->enemy())
 	{
@@ -26,7 +26,7 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
 				state = LOCATIONASSIGN;
 			}
 
-			for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+			for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 			{
 				it->second.clear();
 				std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(it->first->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
@@ -45,7 +45,7 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit* unit)
 	}
 }
 
-void MutaliskHarassTactic::addArmyUnit(BWAPI::Unit* unit)
+void MutaliskHarassTactic::addArmyUnit(BWAPI::Unit unit)
 {
 	std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(unit->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
 	std::vector<BWAPI::Position> movePath;
@@ -62,7 +62,7 @@ void MutaliskHarassTactic::locationAssign(MutaliskArmy* mutalisk, BWAPI::Positio
 	unitMovePath.clear();
 	moveComplete.clear();
 
-	BWAPI::Unit* beginUnit = (*mutalisk->getUnits().begin()).unit;
+	BWAPI::Unit beginUnit = (*mutalisk->getUnits().begin()).unit;
 	std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(beginUnit->getTilePosition(), BWAPI::TilePosition(endPosition), true, nearPosition);
 	BWAPI::TilePosition targetPosition = pathFind.back();
 	moveTarget = BWAPI::Position(targetPosition);
@@ -87,8 +87,8 @@ void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState next
 
 	if (moveComplete.size() > 0)
 	{
-		std::set<BWAPI::Unit*> nearbyUnits = (*moveComplete.begin())->getUnitsInRadius(12 * 32);
-		BOOST_FOREACH(BWAPI::Unit* u, nearbyUnits)
+		BWAPI::Unitset nearbyUnits = (*moveComplete.begin())->getUnitsInRadius(12 * 32);
+		BOOST_FOREACH(BWAPI::Unit u, nearbyUnits)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy() && u->getType().airWeapon() != BWAPI::WeaponTypes::None)
 			{
@@ -111,7 +111,7 @@ void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState next
 	}
 	else
 	{
-		for (std::map<BWAPI::Unit*, std::list<BWAPI::TilePosition>>::iterator it = unitMovePath.begin(); it != unitMovePath.end();)
+		for (std::map<BWAPI::Unit, std::list<BWAPI::TilePosition>>::iterator it = unitMovePath.begin(); it != unitMovePath.end();)
 		{
 			if (!it->first->exists())
 			{
@@ -152,7 +152,7 @@ void MutaliskHarassTactic::update()
 
 	if (BWAPI::Broodwar->getFrameCount() % 100 == 0)
 	{
-		for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+		for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 		{
 			it->second.clear();
 			std::list<BWAPI::TilePosition> pathFind = aStarPathFinding(it->first->getTilePosition(), tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit->getTilePosition(), true, true);
@@ -169,12 +169,12 @@ void MutaliskHarassTactic::update()
 	MutaliskArmy* mutalisk = dynamic_cast<MutaliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]);
 	std::vector<std::vector<gridInfo>>& imInfo = InformationManager::Instance().getEnemyInfluenceMap();
 
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& regionDetail = InformationManager::Instance().getEnemyOccupiedDetail();
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& regionDetail = InformationManager::Instance().getEnemyOccupiedDetail();
 	int antiairBuildingCount = 0;
 	if (regionDetail.find(BWTA::getRegion(attackPosition)) != regionDetail.end())
 	{
-		std::map<BWAPI::Unit*, buildingInfo> buildinginfo = regionDetail[BWTA::getRegion(attackPosition)];
-		for (std::map<BWAPI::Unit*, buildingInfo>::iterator it = buildinginfo.begin(); it != buildinginfo.end(); it++)
+		std::map<BWAPI::Unit, buildingInfo> buildinginfo = regionDetail[BWTA::getRegion(attackPosition)];
+		for (std::map<BWAPI::Unit, buildingInfo>::iterator it = buildinginfo.begin(); it != buildinginfo.end(); it++)
 		{
 			if (it->second.unitType.isBuilding() && (it->second.unitType.airWeapon() != BWAPI::WeaponTypes::None || it->second.unitType == BWAPI::UnitTypes::Terran_Bunker))
 			{
@@ -264,9 +264,9 @@ bool MutaliskHarassTactic::hasEnemy()
 	if (!BWAPI::Broodwar->isVisible(BWAPI::TilePosition(attackPosition)))
 		return true;
 
-	std::set<BWAPI::Unit*>& units = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 12 * 32);
+	BWAPI::Unitset& units = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 12 * 32);
 	bool needAttack = false;
-	BOOST_FOREACH(BWAPI::Unit* u, units)
+	BOOST_FOREACH(BWAPI::Unit u, units)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition) && u->getType() != BWAPI::UnitTypes::Protoss_Observer)
 		{
@@ -277,18 +277,18 @@ bool MutaliskHarassTactic::hasEnemy()
 	if (needAttack == false)
 	{
 		std::vector<std::vector<gridInfo>>& imInfo = InformationManager::Instance().getEnemyInfluenceMap();
-		std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& occupiedDetail = InformationManager::Instance().getEnemyOccupiedDetail();
+		std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& occupiedDetail = InformationManager::Instance().getEnemyOccupiedDetail();
 		BWAPI::TilePosition curPosition = (*tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().begin()).unit->getTilePosition();
 		BWAPI::Position maxAttackPosition;
 		int maxDistance = 0;
 
 		if (occupiedDetail.find(BWTA::getRegion(originAttackBase)) != occupiedDetail.end())
 		{
-			std::map<BWAPI::Unit*, buildingInfo >& buildingsDetail = occupiedDetail[BWTA::getRegion(originAttackBase)];
-			for (std::map<BWAPI::Unit*, buildingInfo >::iterator it = buildingsDetail.begin(); it != buildingsDetail.end(); it++)
+			std::map<BWAPI::Unit, buildingInfo >& buildingsDetail = occupiedDetail[BWTA::getRegion(originAttackBase)];
+			for (std::map<BWAPI::Unit, buildingInfo >::iterator it = buildingsDetail.begin(); it != buildingsDetail.end(); it++)
 			{
 				//if building can attack, return
-				if (imInfo[BWAPI::TilePosition(it->second.initPosition).x()][BWAPI::TilePosition(it->second.initPosition).y()].airForce / 20 <= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() / 4)
+				if (imInfo[BWAPI::TilePosition(it->second.initPosition).x][BWAPI::TilePosition(it->second.initPosition).y].airForce / 20 <= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() / 4)
 					//&& it->second.initPosition.getDistance(BWAPI::TilePosition(curPosition)) > maxDistance)
 				{
 					if ((!it->second.unitType.isRefinery() && buildingsDetail.size() > 1) ||
@@ -312,17 +312,17 @@ bool MutaliskHarassTactic::hasEnemy()
 int MutaliskHarassTactic::needRetreat()
 {
 	bool retreat = false;
-	std::set<BWAPI::Unit*> nearbyUnits;
+	BWAPI::Unitset nearbyUnits;
 	int mutaliskCount = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size();
-	BWAPI::Unit* firstUnit = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit;
+	BWAPI::Unit firstUnit = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().front().unit;
 
 	int ourSupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired());
 	
 	//enemy unit is picked in the same range
 	nearbyUnits = firstUnit->getUnitsInRadius(12 * 32);
-	std::set<BWAPI::Unit*> middleUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits()[mutaliskCount / 2].unit->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset middleUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits()[mutaliskCount / 2].unit->getUnitsInRadius(12 * 32);
 	nearbyUnits.insert(middleUnitnearby.begin(), middleUnitnearby.end());
-	std::set<BWAPI::Unit*> backUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().back().unit->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset backUnitnearby = tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().back().unit->getUnitsInRadius(12 * 32);
 	nearbyUnits.insert(backUnitnearby.begin(), backUnitnearby.end());
 
 
@@ -330,7 +330,7 @@ int MutaliskHarassTactic::needRetreat()
 	int inRegionEnemySupply = 0;
 	int outRegionEnemySupply = 0;
 	int cannonSupply = 0;
-	BOOST_FOREACH(BWAPI::Unit* u, nearbyUnits)
+	BOOST_FOREACH(BWAPI::Unit u, nearbyUnits)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy() && (u->getType().airWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker))
 		{

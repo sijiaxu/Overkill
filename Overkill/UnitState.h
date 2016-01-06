@@ -5,7 +5,7 @@ enum microState { Attack = 0, LOWHEALTHRetreat = 1, Kite = 2, InCannonRange = 3,
 
 struct UnitState
 {
-	UnitState(BWAPI::Unit* u)
+	UnitState(BWAPI::Unit u)
 	{
 		state = Attack;
 		unit = u;
@@ -14,7 +14,7 @@ struct UnitState
 		nextRetreatFrame = 0;
 	}
 	microState state;
-	BWAPI::Unit* unit;
+	BWAPI::Unit unit;
 	BWAPI::Position retreatPosition;
 
 	int currentHealth;

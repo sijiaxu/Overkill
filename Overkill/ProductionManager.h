@@ -17,7 +17,7 @@ public:
 	CompareWhenStarted() {}
 
 	// the sorting operator
-	bool operator() (BWAPI::Unit * u1, BWAPI::Unit * u2)
+	bool operator() (BWAPI::Unit u1, BWAPI::Unit u2)
 	{
 		int startedU1 = BWAPI::Broodwar->getFrameCount() - (u1->getType().buildTime() - u1->getRemainingBuildTime());
 		int startedU2 = BWAPI::Broodwar->getFrameCount() - (u2->getType().buildTime() - u2->getRemainingBuildTime());
@@ -62,7 +62,7 @@ class ProductionManager
 	bool						rushDetected;
 
 	BWAPI::TilePosition			predictedTilePosition;
-	BWAPI::Unit *				selectUnitOfType(BWAPI::UnitType type, BWAPI::UnitType targetType, bool leastTrainingTimeRemaining = true, BWAPI::Position closestTo = BWAPI::Position(0, 0));
+	BWAPI::Unit				selectUnitOfType(BWAPI::UnitType type, BWAPI::UnitType targetType, bool leastTrainingTimeRemaining = true, BWAPI::Position closestTo = BWAPI::Position(0, 0));
 	BuildOrderQueue				queue;
 
 	int							recoverDroneCount;
@@ -70,17 +70,17 @@ class ProductionManager
 
 	BWAPI::UnitType				getProducer(MetaType t);
 
-	bool						contains(UnitVector & units, BWAPI::Unit * unit);
+	bool						contains(UnitVector & units, BWAPI::Unit unit);
 	void						populateTypeCharMap();
 	bool						hasResources(BWAPI::UnitType type);
 	bool						canMake(BWAPI::UnitType type);
 	bool						hasNumCompletedUnitType(BWAPI::UnitType type, int num);
 	bool						meetsReservedResources(MetaType type);
 	
-	void						createMetaType(BWAPI::Unit * producer, MetaType type);
+	void						createMetaType(BWAPI::Unit producer, MetaType type);
 	void						manageBuildOrderQueue();
 	void						performCommand(BWAPI::UnitCommandType t);
-	bool						canMakeNow(BWAPI::Unit * producer, MetaType t);
+	bool						canMakeNow(BWAPI::Unit producer, MetaType t);
 	void						predictWorkerMovement(const Building & b);
 
 	bool						detectBuildOrderDeadlock();
@@ -124,8 +124,8 @@ public:
 	void						update();
 
 	void						onGameEnd();
-	void						onUnitMorph(BWAPI::Unit * unit);
-	void						onUnitDestroy(BWAPI::Unit * unit);
+	void						onUnitMorph(BWAPI::Unit unit);
+	void						onUnitDestroy(BWAPI::Unit unit);
 	
 	void						drawProductionInformation(int x, int y);
 

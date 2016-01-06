@@ -8,15 +8,15 @@ void MutaliskArmy::defend(BWAPI::Position priorityPosition)
 		return;
 
 	//attack the target region, enemy's priority is decided by defend tactic
-	BWAPI::Unit* unit = (*units.begin()).unit;
-	std::set<BWAPI::Unit*> enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 8 * 32);
+	BWAPI::Unit unit = (*units.begin()).unit;
+	BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 8 * 32);
 	int mutaliskSpeed = int(BWAPI::UnitTypes::Zerg_Mutalisk.topSpeed());
 
 	// loop through enemySet to get the top n target for n mutalisk group
 	std::vector<EnemyUnit> priorityEnemy;
 	priorityEnemy.reserve(100);
 
-	BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+	BOOST_FOREACH(BWAPI::Unit u, enemySet)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy())
 		{
@@ -49,15 +49,15 @@ void MutaliskArmy::mixArmyAttack(BWAPI::Position priorityPosition)
 	if (units.size() == 0)
 		return;
 
-	BWAPI::Unit* unit = (*units.begin()).unit;
+	BWAPI::Unit unit = (*units.begin()).unit;
 
-	std::set<BWAPI::Unit*> enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
+	BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
 
 	// loop through enemySet to get the top n target for n mutalisk group
 	std::vector<EnemyUnit> priorityEnemy;
 	priorityEnemy.reserve(100);
 
-	BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+	BOOST_FOREACH(BWAPI::Unit u, enemySet)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy())
 		{	//get the high priority and closed to priorityPosition unit
@@ -87,12 +87,12 @@ void MutaliskArmy::attack(BWAPI::Position priorityPosition)
 	if (units.size() == 0)
 		return;
 
-	BWAPI::Unit* unit = (*units.begin()).unit;
-	BWAPI::Broodwar->drawCircleMap(unit->getPosition().x(), unit->getPosition().y(), 8 * 32, BWAPI::Colors::Purple, false);
-	BWAPI::Broodwar->drawCircleMap(priorityPosition.x(), priorityPosition.y(), 8 * 32, BWAPI::Colors::Purple, false);
+	BWAPI::Unit unit = (*units.begin()).unit;
+	BWAPI::Broodwar->drawCircleMap(unit->getPosition().x, unit->getPosition().y, 8 * 32, BWAPI::Colors::Purple, false);
+	BWAPI::Broodwar->drawCircleMap(priorityPosition.x, priorityPosition.y, 8 * 32, BWAPI::Colors::Purple, false);
 
-	std::set<BWAPI::Unit*> enemySet = unit->getUnitsInRadius(12 * 32);
-	//std::set<BWAPI::Unit*> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 8 * 32);
+	BWAPI::Unitset enemySet = unit->getUnitsInRadius(12 * 32);
+	//std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 8 * 32);
 
 	//enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
 
@@ -100,7 +100,7 @@ void MutaliskArmy::attack(BWAPI::Position priorityPosition)
 	std::vector<EnemyUnit> priorityEnemy;
 	priorityEnemy.reserve(100);
 	
-	BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+	BOOST_FOREACH(BWAPI::Unit u, enemySet)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy())
 		{	
@@ -123,14 +123,14 @@ void MutaliskArmy::attack(BWAPI::Position priorityPosition)
 }
 
 
-BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit* target, bool avoidCannon)
+BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit target, bool avoidCannon)
 {
 	int mutaliskAttackRange = BWAPI::UnitTypes::Zerg_Mutalisk.groundWeapon().maxRange() / 32;
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
 
-	double2 origin(target->getTilePosition().x(), target->getTilePosition().y());
-	int x = target->getTilePosition().x();
-	int y = target->getTilePosition().y();
+	double2 origin(target->getTilePosition().x, target->getTilePosition().y);
+	int x = target->getTilePosition().x;
+	int y = target->getTilePosition().y;
 	int length = 1;
 	int j = 0;
 	bool first = true;
@@ -201,7 +201,7 @@ BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit* target, bool avoidCanno
 }
 
 
-void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
+void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit target)
 {
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
 	int deltaMove = 0;
@@ -215,7 +215,7 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 		jobCode = 'M';
 	}
 
-	BWAPI::Broodwar->drawTextMap(myUnit.unit->getPosition().x(), myUnit.unit->getPosition().y() - 5, "\x07%c", jobCode);
+	BWAPI::Broodwar->drawTextMap(myUnit.unit->getPosition().x, myUnit.unit->getPosition().y - 5, "\x07%c", jobCode);
 	BWAPI::TilePosition unitCenter = BWAPI::TilePosition(myUnit.unit->getPosition());
 	
 	switch (myUnit.state)
@@ -234,7 +234,7 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 			&& target->getType() != BWAPI::UnitTypes::Terran_Missile_Turret
 			&& target->getType() != BWAPI::UnitTypes::Zerg_Spore_Colony
 			&& target->getType() != BWAPI::UnitTypes::Terran_Bunker
-			&& influnceMap[unitCenter.x()][unitCenter.y()].airForce > 0
+			&& influnceMap[unitCenter.x][unitCenter.y].airForce > 0
 			&& BWAPI::Broodwar->getFrameCount() > myUnit.nextRetreatFrame)
 		{
 			myUnit.retreatPosition = findSafePlace(target, true);
@@ -243,7 +243,7 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 				myUnit.unit->move(myUnit.retreatPosition);
 				myUnit.unit->stop(true);
 				myUnit.state = MoveToSafePlace;
-				//BWAPI::Broodwar->printf("from (%d,%d) move to (%d,%d)", unitCenter.x(), unitCenter.y(), BWAPI::TilePosition(myUnit.retreatPosition).x(), BWAPI::TilePosition(myUnit.retreatPosition).y());
+				//BWAPI::Broodwar->printf("from (%d,%d) move to (%d,%d)", unitCenter.x, unitCenter.y, BWAPI::TilePosition(myUnit.retreatPosition).x, BWAPI::TilePosition(myUnit.retreatPosition).y);
 				break;
 				//myUnit.unit->stop(true);
 				//myUnit.unit->attack(target->getPosition(), true);
@@ -257,8 +257,8 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 			double2 direc = myUnit.unit->getPosition() - target->getPosition();
 			double2 direcNormal = direc / direc.len();
 
-			int targetx = myUnit.unit->getPosition().x() + int(direcNormal.x * 32 * 4);
-			int targety = myUnit.unit->getPosition().y() + int(direcNormal.y * 32 * 4);
+			int targetx = myUnit.unit->getPosition().x + int(direcNormal.x * 32 * 4);
+			int targety = myUnit.unit->getPosition().y + int(direcNormal.y * 32 * 4);
 
 			myUnit.retreatPosition = BWAPI::Position(targetx < 0 ? 32 * 2 : (targetx > BWAPI::Broodwar->mapWidth() * 32 ? BWAPI::Broodwar->mapWidth() * 30 : targetx), targety < 0 ? 32 * 2 : (targety > BWAPI::Broodwar->mapHeight() * 32 ? BWAPI::Broodwar->mapHeight() * 30 : targety));
 			*/
@@ -279,8 +279,8 @@ void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit* target)
 	}
 	case MoveToSafePlace:
 	{
-		BWAPI::Broodwar->drawCircleMap(myUnit.retreatPosition.x(), myUnit.retreatPosition.y(), 8, BWAPI::Colors::Green, true);
-		BWAPI::Broodwar->drawLineMap(BWAPI::Position(unitCenter).x(), BWAPI::Position(unitCenter).y(), myUnit.retreatPosition.x(), myUnit.retreatPosition.y(), BWAPI::Colors::Green);
+		BWAPI::Broodwar->drawCircleMap(myUnit.retreatPosition.x, myUnit.retreatPosition.y, 8, BWAPI::Colors::Green, true);
+		BWAPI::Broodwar->drawLineMap(BWAPI::Position(unitCenter).x, BWAPI::Position(unitCenter).y, myUnit.retreatPosition.x, myUnit.retreatPosition.y, BWAPI::Colors::Green);
 
 		if (myUnit.unit->getTarget() != NULL && myUnit.unit->getTarget()->getType() == BWAPI::UnitTypes::Protoss_Photon_Cannon)
 		{
@@ -334,16 +334,16 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 	int mutaliskAttackDamage = BWAPI::UnitTypes::Zerg_Mutalisk.groundWeapon().damageAmount();
 	int mutaliskSpeed = int(BWAPI::UnitTypes::Zerg_Mutalisk.topSpeed());
 
-	BWAPI::Unit* unit = units.front().unit;
-	BWAPI::Broodwar->drawCircleMap(unit->getPosition().x(), unit->getPosition().y(), 12 * 32, BWAPI::Colors::Green, false);
+	BWAPI::Unit unit = units.front().unit;
+	BWAPI::Broodwar->drawCircleMap(unit->getPosition().x, unit->getPosition().y, 12 * 32, BWAPI::Colors::Green, false);
 
-	std::set<BWAPI::Unit*> enemySet = unit->getUnitsInRadius(12 * 32);
-	std::set<BWAPI::Unit*> middleUnitnearby = units[units.size() / 2].unit->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset enemySet = unit->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset middleUnitnearby = units[units.size() / 2].unit->getUnitsInRadius(12 * 32);
 	enemySet.insert(middleUnitnearby.begin(), middleUnitnearby.end());
-	std::set<BWAPI::Unit*> backUnitnearby = units.back().unit->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset backUnitnearby = units.back().unit->getUnitsInRadius(12 * 32);
 	enemySet.insert(backUnitnearby.begin(), backUnitnearby.end());
 
-	//std::set<BWAPI::Unit*> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
+	//std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
 	//enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
 
 	std::vector<std::vector<gridInfo>>& imInfo = InformationManager::Instance().getEnemyInfluenceMap();
@@ -355,7 +355,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 	//normal mode
 	if (attackMode == 1)
 	{
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			//TODO: BWAPI bugs, addon's getplayer is not enemy
 			if (u->getPlayer() == BWAPI::Broodwar->enemy() || u->getType().isAddon())
@@ -368,14 +368,14 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 
 				//first mutalisk always attack highest priority target, so enemy's priority is relative fixed in a short time
 				priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), unit->getDistance(u)));
-				BWAPI::Broodwar->drawCircleMap(u->getPosition().x(), u->getPosition().y(), 8, BWAPI::Colors::Purple, true);
+				BWAPI::Broodwar->drawCircleMap(u->getPosition().x, u->getPosition().y, 8, BWAPI::Colors::Purple, true);
 			}
 		}
 	}
 	// only attack has-air-weapon unit
 	else if (attackMode == 3)
 	{
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy() && (u->getType().airWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker)
 				&& BWTA::getRegion(priorityPosition) == BWTA::getRegion(u->getPosition()))
@@ -383,7 +383,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 				if (u->getType() == BWAPI::UnitTypes::Protoss_Observer)
 					continue;
 				priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), unit->getDistance(u)));
-				BWAPI::Broodwar->drawCircleMap(u->getPosition().x(), u->getPosition().y(), 8, BWAPI::Colors::Purple, true);
+				BWAPI::Broodwar->drawCircleMap(u->getPosition().x, u->getPosition().y, 8, BWAPI::Colors::Purple, true);
 			}
 		}
 	}
@@ -391,7 +391,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 	//special attack, when facing large cannon
 	else
 	{
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			//TODO: BWAPI bugs, addon's getplayer is not enemy
 			if (u->getPlayer() == BWAPI::Broodwar->enemy() || u->getType().isAddon()) // && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(priorityPosition))
@@ -406,7 +406,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 				if (tmp != BWAPI::Positions::None)
 				{
 					priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), unit->getDistance(u)));
-					BWAPI::Broodwar->drawCircleMap(u->getPosition().x(), u->getPosition().y(), 4, BWAPI::Colors::Red, true);
+					BWAPI::Broodwar->drawCircleMap(u->getPosition().x, u->getPosition().y, 4, BWAPI::Colors::Red, true);
 				}
 			}
 		}
@@ -475,7 +475,7 @@ void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 	}
 }
 
-int MutaliskArmy::harassAttackPriority(BWAPI::Unit * unit)
+int MutaliskArmy::harassAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 
@@ -540,7 +540,7 @@ int MutaliskArmy::harassAttackPriority(BWAPI::Unit * unit)
 }
 
 
-int MutaliskArmy::getAttackPriority(BWAPI::Unit * unit)
+int MutaliskArmy::getAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 

@@ -26,14 +26,14 @@ void sixZerglingTactic::update()
 		armyDistance.push_back(unitDistance(u.unit, u.unit->getDistance(attackPosition)));
 	}
 	std::sort(armyDistance.begin(), armyDistance.end());
-	BWAPI::Unit* firstZergling = armyDistance.front().unit;
-	BWAPI::Broodwar->drawCircleMap(armyDistance.front().unit->getPosition().x(), armyDistance.back().unit->getPosition().y(), 8, BWAPI::Colors::Black, true);
+	BWAPI::Unit firstZergling = armyDistance.front().unit;
+	BWAPI::Broodwar->drawCircleMap(armyDistance.front().unit->getPosition().x, armyDistance.back().unit->getPosition().y, 8, BWAPI::Colors::Black, true);
 
 	if (BWAPI::Broodwar->getFrameCount() % 25 * 5 == 0)
 	{
 		newAddMovePositions.clear();
 		newAddMovePositions.push_back(firstZergling->getPosition());
-		for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+		for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 		{
 			it->second = newAddMovePositions;
 		}
@@ -47,9 +47,9 @@ void sixZerglingTactic::update()
 	//BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits())
 	//{
 
-	std::set<BWAPI::Unit*> tmp = firstZergling->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset tmp = firstZergling->getUnitsInRadius(12 * 32);
 	// if enemy can attack us, add in nearby enemies count
-	BOOST_FOREACH(BWAPI::Unit* unit, tmp)
+	BOOST_FOREACH(BWAPI::Unit unit, tmp)
 	{
 		if (unit->getPlayer() == BWAPI::Broodwar->enemy())
 		{
@@ -81,12 +81,12 @@ void sixZerglingTactic::update()
 	else
 		moveBackBase = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
 
-	std::set<BWAPI::Unit*> sunkenNearbyEnemy;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
+	std::set<BWAPI::Unit> sunkenNearbyEnemy;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
 	int sunkunRange = BWAPI::UnitTypes::Zerg_Sunken_Colony.groundWeapon().maxRange();
 	int minDistance = 99999;
-	BWAPI::Unit* minDistanceSunker = NULL;
-	BOOST_FOREACH(BWAPI::Unit* sunker, myBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony])
+	BWAPI::Unit minDistanceSunker = NULL;
+	BOOST_FOREACH(BWAPI::Unit sunker, myBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony])
 	{
 		if (BWTA::getRegion(sunker->getPosition()) == BWTA::getRegion(moveBackBase)) //(BWTA::getRegion(sunker->getPosition()) == BWTA::getRegion(attackPosition))
 		{
@@ -100,10 +100,10 @@ void sixZerglingTactic::update()
 
 	if (minDistanceSunker != NULL)
 	{
-		std::set<BWAPI::Unit*> tmp = minDistanceSunker->getUnitsInRadius(sunkunRange);
-		BWAPI::Broodwar->drawCircleMap(minDistanceSunker->getPosition().x(), minDistanceSunker->getPosition().y(), 8 * 32, BWAPI::Colors::Blue, false);
+		BWAPI::Unitset tmp = minDistanceSunker->getUnitsInRadius(sunkunRange);
+		BWAPI::Broodwar->drawCircleMap(minDistanceSunker->getPosition().x, minDistanceSunker->getPosition().y, 8 * 32, BWAPI::Colors::Blue, false);
 
-		BOOST_FOREACH(BWAPI::Unit* enemy, tmp)
+		BOOST_FOREACH(BWAPI::Unit enemy, tmp)
 		{
 			if (enemy->getType().isFlyer() && tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
 				&& tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
@@ -114,19 +114,19 @@ void sixZerglingTactic::update()
 		}
 	}
 
-	std::set<BWAPI::Unit*> unitsInCircle;
+	BWAPI::Unitset unitsInCircle;
 	if (minDistanceSunker != NULL)
 	{
 		unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(moveBackBase, 8 * 32);
-		BWAPI::Broodwar->drawCircleMap(moveBackBase.x(), moveBackBase.y(), 6 * 32, BWAPI::Colors::Blue, false);
+		BWAPI::Broodwar->drawCircleMap(moveBackBase.x, moveBackBase.y, 6 * 32, BWAPI::Colors::Blue, false);
 	}
 	else
 	{
 		unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(moveBackBase, 12 * 32);
-		BWAPI::Broodwar->drawCircleMap(moveBackBase.x(), moveBackBase.y(), 12 * 32, BWAPI::Colors::Blue, false);
+		BWAPI::Broodwar->drawCircleMap(moveBackBase.x, moveBackBase.y, 12 * 32, BWAPI::Colors::Blue, false);
 	}
-	std::set<BWAPI::Unit*> enemyInCircle;
-	BOOST_FOREACH(BWAPI::Unit* enemy, unitsInCircle)
+	std::set<BWAPI::Unit> enemyInCircle;
+	BOOST_FOREACH(BWAPI::Unit enemy, unitsInCircle)
 	{
 		if (enemy->getPlayer() == BWAPI::Broodwar->enemy())
 		{
@@ -202,7 +202,7 @@ void sixZerglingTactic::update()
 
 	case RETREAT:
 	{
-		BWAPI::Broodwar->drawCircleMap(nextRetreatPosition.x(), nextRetreatPosition.y(), 8, BWAPI::Colors::Red, true);
+		BWAPI::Broodwar->drawCircleMap(nextRetreatPosition.x, nextRetreatPosition.y, 8, BWAPI::Colors::Red, true);
 		
 		bool isUnderAttack = false;
 		BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits())
@@ -252,7 +252,7 @@ void sixZerglingTactic::update()
 		/*
 		if (zerglings->getUnits().size() >= 6 || nearbyUnits.size() > 0 || BWAPI::Broodwar->getFrameCount() > nextAttackTime)
 		{
-		double2 centerPoint(firstZergling->getTilePosition().x(), firstZergling->getTilePosition().y());
+		double2 centerPoint(firstZergling->getTilePosition().x, firstZergling->getTilePosition().y);
 		int maxIM = 0;
 		for (int x = centerPoint.x - 8 < 0 ? 0 : centerPoint.x - 8; x <= (centerPoint.x + 8 > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1: centerPoint.x + 8); x++)
 		{
@@ -299,15 +299,15 @@ sixZerglingTactic::sixZerglingTactic()
 bool sixZerglingTactic::needRetreat()
 {
 	int ourArmySupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size());
-	BOOST_FOREACH(BWAPI::Unit* u, friendUnitNearBy)
+	BOOST_FOREACH(BWAPI::Unit u, friendUnitNearBy)
 	{
 		ourArmySupply += u->getType().supplyRequired();
 	}
 
-	BWAPI::Unit* firstZergling = (*tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().begin()).unit;
+	BWAPI::Unit firstZergling = (*tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().begin()).unit;
 
 	std::vector<std::vector<gridInfo>>& enemyIm = InformationManager::Instance().getEnemyInfluenceMap();
-	double2 centerPoint(firstZergling->getTilePosition().x(), firstZergling->getTilePosition().y());
+	double2 centerPoint(firstZergling->getTilePosition().x, firstZergling->getTilePosition().y);
 	int maxIM = 0;
 	for (int x = int(centerPoint.x - 8 < 0 ? 0 : centerPoint.x - 8); x <= int(centerPoint.x + 8 > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : centerPoint.x + 8); x++)
 	{
@@ -326,7 +326,7 @@ bool sixZerglingTactic::needRetreat()
 	}
 
 	int enemySupply = 0;
-	BOOST_FOREACH(BWAPI::Unit* u, nearbyUnits)
+	BOOST_FOREACH(BWAPI::Unit u, nearbyUnits)
 	{
 		if (u->getType().isBuilding() && u->isCompleted() && (u->getType().groundWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker))
 		{

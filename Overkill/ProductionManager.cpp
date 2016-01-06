@@ -127,8 +127,8 @@ void ProductionManager::RushDefend(BWAPI::UnitType defendBuilding, int buildingC
 
 	double2 direc = chokePosition - basePositon;
 	double2 direcNormal = direc / direc.len();
-	int targetx = (basePositon.x() + int(direcNormal.x * 32 * 10)) / 32;
-	int targety = (basePositon.y() + int(direcNormal.y * 32 * 10)) / 32;
+	int targetx = (basePositon.x + int(direcNormal.x * 32 * 10)) / 32;
+	int targety = (basePositon.y + int(direcNormal.y * 32 * 10)) / 32;
 
 	for (int i = 0; i < unitCount; i++)
 	{
@@ -191,7 +191,7 @@ void ProductionManager::clearDefendVector()
 std::vector<BWAPI::UnitType> ProductionManager::getWaitingProudctUnit()
 {
 	std::vector<BWAPI::UnitType> topWaitingProduct;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& ourBuildings = InformationManager::Instance().getOurAllBuildingUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourBuildings = InformationManager::Instance().getOurAllBuildingUnit();
 	for (int i = queue.size() - 1; i >= 0; i--)
 	{
 		if (queue[i].metaType.isUnit() && !queue[i].metaType.unitType.isWorker() && queue[i].metaType.unitType.canAttack() && !queue[i].metaType.unitType.isBuilding())
@@ -216,9 +216,9 @@ std::vector<BWAPI::UnitType> ProductionManager::getWaitingProudctUnit()
 void ProductionManager::buildExtractorTrick()
 {
 	//extractor trick
-	BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 	{
-		if (u->getType() == BWAPI::UnitTypes::Zerg_Extractor && queue.getHighestPriorityItem().metaType.unitType != BWAPI::UnitTypes::Zerg_Drone //&& u->getRemainingBuildTime() / double(BWAPI::UnitTypes::Zerg_Extractor.buildTime()) < 0.7
+		if (u->getType() == BWAPI::UnitTypes::Zerg_Extractor && u->getRemainingBuildTime() / double(BWAPI::UnitTypes::Zerg_Extractor.buildTime()) < 0.7
 			&& BWAPI::Broodwar->self()->supplyUsed() == 9 * 2)
 		{
 			u->cancelMorph();
@@ -241,7 +241,7 @@ void ProductionManager::update()
 	manageBuildOrderQueue();
 
 	openingStrategy opening = StrategyManager::Instance().getCurrentopeningStrategy();
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& ourBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 
 	// production FSM
 	switch (productionState)
@@ -277,7 +277,7 @@ void ProductionManager::update()
 		case TwelveHatchMuta:
 		{
 			//build sunken at natural first
-			BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+			BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 			{
 				if (u->getType() == BWAPI::UnitTypes::Zerg_Hatchery && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())
 					&& u->isCompleted() && sunkenBuilderTrigger)
@@ -292,7 +292,7 @@ void ProductionManager::update()
 					&& u->getRemainingBuildTime() / double(BWAPI::UnitTypes::Zerg_Hatchery.buildTime()) < 0.2 && sunkenWorkerTrigger)
 				{
 					sunkenWorkerTrigger = false;
-					//BWAPI::Unit * moveWorker = WorkerManager::Instance().getMoveWorker(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+					//BWAPI::Unit moveWorker = WorkerManager::Instance().getMoveWorker(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
 					WorkerManager::Instance().setMoveWorker(75, 0, BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
 				}
 
@@ -366,8 +366,23 @@ void ProductionManager::update()
 				sunkenBuilderTrigger = false;
 				sunkenCanBuild = true;
 				sunkenBuilderTime = BWAPI::Broodwar->getFrameCount() + 5 * 25;
+
+				const std::function<void(BWAPI::Game*)> triggerAction = [&](BWAPI::Game* g)->void
+				{
+					triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1);
+					InformationManager::Instance().addWaitBuildSunkun(1);
+
+					BWAPI::Broodwar->printf("fix building order finish");
+					productionState = goalOriented;
+				};
+				const std::function<bool(BWAPI::Game*)> triggerCondition = [&](BWAPI::Game* g)->bool
+				{
+					return BWAPI::Broodwar->getFrameCount() > sunkenBuilderTime;
+				};
+				BWAPI::Broodwar->registerEvent(triggerAction, triggerCondition, 1, 25);
 			}
-			
+			  
+			/*
 			if (BWAPI::Broodwar->getFrameCount() > sunkenBuilderTime && sunkenCanBuild)
 			{
 				sunkenCanBuild = false;
@@ -376,7 +391,7 @@ void ProductionManager::update()
 
 				BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
 				productionState = goalOriented;
-			}
+			}*/
 
 		}
 			break;
@@ -385,7 +400,7 @@ void ProductionManager::update()
 			buildExtractorTrick();
 
 			//build sunken at natural first
-			BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+			BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 			{
 				if (u->getType() == BWAPI::UnitTypes::Zerg_Hatchery && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())
 					&& u->isCompleted() && sunkenBuilderTrigger)
@@ -401,7 +416,7 @@ void ProductionManager::update()
 					&& u->getRemainingBuildTime() / double(BWAPI::UnitTypes::Zerg_Hatchery.buildTime()) < 0.2 && sunkenWorkerTrigger)
 				{
 					sunkenWorkerTrigger = false;
-					//BWAPI::Unit * moveWorker = WorkerManager::Instance().getMoveWorker(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+					//BWAPI::Unit moveWorker = WorkerManager::Instance().getMoveWorker(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
 					WorkerManager::Instance().setMoveWorker(75, 0, BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
 				}
 			}
@@ -545,7 +560,7 @@ void ProductionManager::onDroneProduction()
 			waitDroneCount++;
 	}
 
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& allUnits = InformationManager::Instance().getOurAllBattleUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& allUnits = InformationManager::Instance().getOurAllBattleUnit();
 	//keep the drone production interval the same as one base's larva production rate
 	if (waitDroneCount < 3 && allUnits[BWAPI::UnitTypes::Zerg_Drone].size() <= 80 && BWAPI::Broodwar->getFrameCount() % droneProductionSpeed == 0)//BWAPI::Broodwar->getFrameCount() % 350 == 0)
 	{
@@ -563,7 +578,7 @@ void ProductionManager::onExtractorProduction()
 {
 	bool hasGasPosition = false;
 	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
-	BOOST_FOREACH(BWAPI::Unit* geyser, BWAPI::Broodwar->getGeysers())
+	BOOST_FOREACH(BWAPI::Unit geyser, BWAPI::Broodwar->getGeysers())
 	{
 		//not my region
 		if (myRegions.find(BWTA::getRegion(geyser->getPosition())) == myRegions.end())
@@ -605,14 +620,14 @@ void ProductionManager::onHatcheryProduction()
 	//check if base is full of worker
 	std::set<BWTA::Region *> & ourRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 	std::map<BWTA::Region*, std::pair<int, int>> regionMineralWorker;
-	BOOST_FOREACH(BWAPI::Unit* mineral, BWAPI::Broodwar->getMinerals())
+	BOOST_FOREACH(BWAPI::Unit mineral, BWAPI::Broodwar->getMinerals())
 	{
 		if (ourRegion.find(BWTA::getRegion(mineral->getPosition())) != ourRegion.end())
 		{
 			regionMineralWorker[BWTA::getRegion(mineral->getPosition())].first += 1;
 		}
 	}
-	BOOST_FOREACH(BWAPI::Unit* worker, BWAPI::Broodwar->self()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit worker, BWAPI::Broodwar->self()->getUnits())
 	{
 		if (worker->getType().isWorker() && ourRegion.find(BWTA::getRegion(worker->getPosition())) != ourRegion.end())
 		{
@@ -631,7 +646,7 @@ void ProductionManager::onHatcheryProduction()
 		}
 	}
 
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 	if (BWAPI::Broodwar->getFrameCount() > HatcheryProductionCheckTime &&
 		((larvaCount && getFreeMinerals() >= 400 && selfAllBuilding[BWAPI::UnitTypes::Zerg_Hatchery].size() <= 15) || !hasIdleDepot))
 	{
@@ -643,7 +658,7 @@ void ProductionManager::onHatcheryProduction()
 		BOOST_FOREACH(BWTA::Region * r, ourRegion)
 		{
 			int mineralsNearDepot = 0;
-			BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getAllUnits())
+			BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
 			{
 				if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field) && BWTA::getRegion(unit->getPosition()) == r)
 				{
@@ -664,7 +679,7 @@ void ProductionManager::onHatcheryProduction()
 }
 
 // on unit destroy
-void ProductionManager::onUnitDestroy(BWAPI::Unit * unit)
+void ProductionManager::onUnitDestroy(BWAPI::Unit unit)
 {
 	if (AttackManager::Instance().isUnderAttack())
 	{
@@ -683,7 +698,7 @@ void ProductionManager::onUnitDestroy(BWAPI::Unit * unit)
 		//for early defend
 		if (unit->getType() == BWAPI::UnitTypes::Zerg_Zergling && BWAPI::Broodwar->getFrameCount() <= 12000)
 		{
-			std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+			std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
 			if (selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*selfAllBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
 				return;
 
@@ -751,7 +766,7 @@ void ProductionManager::manageBuildOrderQueue()
 	while (!queue.isEmpty())
 	{
 		// this is the unit which can produce the currentItem
-		BWAPI::Unit * producer = selectUnitOfType(currentItem.metaType.whatBuilds(), currentItem.metaType.unitType);
+		BWAPI::Unit producer = selectUnitOfType(currentItem.metaType.whatBuilds(), currentItem.metaType.unitType);
 
 		// check to see if we can make it right now, meet the required resource, tech, building
 		// do not check if have legal building place
@@ -805,22 +820,22 @@ void ProductionManager::manageBuildOrderQueue()
 	}
 }
 
-bool ProductionManager::canMakeNow(BWAPI::Unit * producer, MetaType t)
+bool ProductionManager::canMakeNow(BWAPI::Unit producer, MetaType t)
 {
 	bool canMake = meetsReservedResources(t);
 	if (canMake)
 	{
 		if (t.isUnit())
 		{
-			canMake = BWAPI::Broodwar->canMake(producer, t.unitType);
+			canMake = BWAPI::Broodwar->canMake(t.unitType, producer);
 		}
 		else if (t.isTech())
 		{
-			canMake = BWAPI::Broodwar->canResearch(producer, t.techType);
+			canMake = BWAPI::Broodwar->canResearch(t.techType, producer);
 		}
 		else if (t.isUpgrade())
 		{
-			canMake = BWAPI::Broodwar->canUpgrade(producer, t.upgradeType);
+			canMake = BWAPI::Broodwar->canUpgrade(t.upgradeType, producer);
 		}
 		else
 		{
@@ -862,7 +877,7 @@ int ProductionManager::OverlordIsBeingBuilt()
 	int supplyMorph = 0;
 	int minRemainBuildTime = 999999;
 
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getAllUnits())
+	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
 	{
 		if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg)
 		{
@@ -905,9 +920,9 @@ void ProductionManager::predictWorkerMovement(const Building & b)
 	}
 
 	// draw a box where the building will be placed
-	int x1 = predictedTilePosition.x() * 32;
+	int x1 = predictedTilePosition.x * 32;
 	int x2 = x1 + (b.type.tileWidth()) * 32;
-	int y1 = predictedTilePosition.y() * 32;
+	int y1 = predictedTilePosition.y * 32;
 	int y2 = y1 + (b.type.tileHeight()) * 32;
 	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawBoxMap(x1, y1, x2, y2, BWAPI::Colors::Blue, false);
 
@@ -919,7 +934,7 @@ void ProductionManager::predictWorkerMovement(const Building & b)
 	int gasRequired = b.type.gasPrice() - getFreeGas() > 0 ? b.type.gasPrice() - getFreeGas() : 0;
 
 	// get a candidate worker to move to this location
-	BWAPI::Unit * moveWorker = WorkerManager::Instance().getMoveWorker(walkToPosition);
+	BWAPI::Unit moveWorker = WorkerManager::Instance().getMoveWorker(walkToPosition);
 
 	// Conditions under which to move the worker: 
 	//		- there's a valid worker to move
@@ -942,8 +957,8 @@ void ProductionManager::performCommand(BWAPI::UnitCommandType t) {
 	// if it is a cancel construction, it is probably the extractor trick
 	if (t == BWAPI::UnitCommandTypes::Cancel_Construction)
 	{
-		BWAPI::Unit * extractor = NULL;
-		BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->self()->getUnits())
+		BWAPI::Unit extractor = NULL;
+		BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->self()->getUnits())
 		{
 			if (unit->getType() == BWAPI::UnitTypes::Zerg_Extractor)
 			{
@@ -978,7 +993,7 @@ bool ProductionManager::meetsReservedResources(MetaType type)
 
 BWAPI::TilePosition	ProductionManager::getNextHatcheryLocation()
 {
-	std::set<BWAPI::Unit*>& selfAllbase = InformationManager::Instance().getOurAllBaseUnit();
+	std::set<BWAPI::Unit>& selfAllbase = InformationManager::Instance().getOurAllBaseUnit();
 	//the third hatchery build near the choke
 	if (selfAllbase.size() == 1 && InformationManager::Instance().isEarlyRush())
 	{
@@ -992,7 +1007,7 @@ BWAPI::TilePosition	ProductionManager::getNextHatcheryLocation()
 
 
 // this function will check to see if all preconditions are met and then create a unit
-void ProductionManager::createMetaType(BWAPI::Unit * producer, MetaType t)
+void ProductionManager::createMetaType(BWAPI::Unit producer, MetaType t)
 {
 	if (!producer)
 	{
@@ -1068,7 +1083,7 @@ void ProductionManager::createMetaType(BWAPI::Unit * producer, MetaType t)
 }
 
 // selects a unit of a given type
-BWAPI::Unit * ProductionManager::selectUnitOfType(BWAPI::UnitType type, BWAPI::UnitType targetType, bool leastTrainingTimeRemaining, BWAPI::Position closestTo) {
+BWAPI::Unit ProductionManager::selectUnitOfType(BWAPI::UnitType type, BWAPI::UnitType targetType, bool leastTrainingTimeRemaining, BWAPI::Position closestTo) {
 
 	// if we have none of the unit type, return NULL right away
 	if (BWAPI::Broodwar->self()->completedUnitCount(type) == 0)
@@ -1084,14 +1099,14 @@ BWAPI::Unit * ProductionManager::selectUnitOfType(BWAPI::UnitType type, BWAPI::U
 		return InformationManager::Instance().GetOurBaseUnit();
 	}
 
-	BWAPI::Unit * unit = NULL;
+	BWAPI::Unit unit = NULL;
 
 	// if we are concerned about the position of the unit, that takes priority
 	if (closestTo != BWAPI::Position(0, 0)) {
 
 		double minDist(1000000);
 
-		BOOST_FOREACH(BWAPI::Unit * u, BWAPI::Broodwar->self()->getUnits()) {
+		BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits()) {
 
 			if (u->getType() == type) {
 
@@ -1108,9 +1123,9 @@ BWAPI::Unit * ProductionManager::selectUnitOfType(BWAPI::UnitType type, BWAPI::U
 	}
 	else if (type.isBuilding() && leastTrainingTimeRemaining) {
 
-		BOOST_FOREACH(BWAPI::Unit * u, BWAPI::Broodwar->self()->getUnits()) {
+		BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits()) {
 
-			if (u->getType() == type && u->isCompleted() && !u->isResearching() &&!u->isTraining() && !u->isLifted() && !u->isUnpowered()) {
+			if (u->getType() == type && u->isCompleted() && !u->isResearching()) {
 
 				return u;
 			}
@@ -1119,9 +1134,9 @@ BWAPI::Unit * ProductionManager::selectUnitOfType(BWAPI::UnitType type, BWAPI::U
 	}
 	else {
 
-		BOOST_FOREACH(BWAPI::Unit * u, BWAPI::Broodwar->self()->getUnits())
+		BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 		{
-			if (u->getType() == type && u->isCompleted() && u->getHitPoints() > 0 && !u->isLifted() && !u->isUnpowered())
+			if (u->getType() == type && u->isCompleted() && u->getHitPoints() > 0)
 			{
 				return u;
 			}
@@ -1153,8 +1168,8 @@ void ProductionManager::populateTypeCharMap()
 void ProductionManager::drawProductionInformation(int x, int y)
 {
 	// fill prod with each unit which is under construction
-	std::vector<BWAPI::Unit *> prod;
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->self()->getUnits())
+	std::vector<BWAPI::Unit> prod;
+	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->self()->getUnits())
 	{
 		if (unit->isBeingConstructed())
 		{

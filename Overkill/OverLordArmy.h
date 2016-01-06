@@ -10,5 +10,5 @@ public:
 	void defend(BWAPI::Position targetPosition);
 	void attack(BWAPI::Position targetPosition);
 
-	void follow(BWAPI::Unit* target);
+	void follow(BWAPI::Unit target);
 };

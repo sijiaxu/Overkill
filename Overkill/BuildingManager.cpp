@@ -78,7 +78,7 @@ void BuildingManager::update()
 void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
 {
 	b.finalPosition = b.desiredPosition;
-	BWAPI::Unit * workerToAssign = WorkerManager::Instance().getBuilder(b);
+	BWAPI::Unit workerToAssign = WorkerManager::Instance().getBuilder(b);
 	if (workerToAssign)
 	{
 		// set the worker we have assigned
@@ -103,7 +103,7 @@ void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
 			if (b.type.isRefinery())
 			{
 				b.buildingState = Building::refinerySpecial;
-				b.builderUnit->build(b.finalPosition, b.type);
+				b.builderUnit->build(b.type, b.finalPosition);
 			}
 			else
 				b.buildingState = Building::issueBuildOrder;
@@ -111,7 +111,7 @@ void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
 
 		/*
 		// grab a worker unit from WorkerManager which is closest to this final position
-		BWAPI::Unit * workerToAssign = WorkerManager::Instance().getBuilder(b);
+		BWAPI::Unit workerToAssign = WorkerManager::Instance().getBuilder(b);
 
 		// if the worker exists
 		if (workerToAssign)
@@ -179,7 +179,7 @@ void BuildingManager::constructAssignedBuildings(Building& b)
 	}
 
 	// issue the build order!
-	b.builderUnit->build(b.finalPosition, b.type);
+	b.builderUnit->build(b.type, b.finalPosition);
 	b.buildingState = Building::buildingOrderCheck;
 	
 }
@@ -239,7 +239,7 @@ BWAPI::TilePosition BuildingManager::getRefineryPosition()
 	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 
 	//BWAPI::Broodwar->getGeysers() return all accessable gaysers that can not build extractor
-	BOOST_FOREACH(BWAPI::Unit* geyser, BWAPI::Broodwar->getGeysers())
+	BOOST_FOREACH(BWAPI::Unit geyser, BWAPI::Broodwar->getGeysers())
 	{	
 		//not my region
 		if (myRegions.find(BWTA::getRegion(geyser->getPosition())) == myRegions.end())
@@ -261,8 +261,8 @@ BWAPI::TilePosition BuildingManager::getBuildLocationNear(const Building & b, in
 {
 	//returns a valid build location near the specified tile position.
 	//searches outward in a spiral.
-	int x = b.desiredPosition.x();
-	int y = b.desiredPosition.y();
+	int x = b.desiredPosition.x;
+	int y = b.desiredPosition.y;
 	int length = 1;
 	int j = 0;
 	bool first = true;
@@ -358,7 +358,7 @@ bool BuildingManager::canBuildHereWithSpace(BWAPI::TilePosition position, const 
 {
 	
 	//if we can't build here, we of course can't build here with space
-	if (!BWAPI::Broodwar->canBuildHere(b.builderUnit, position, b.type))
+	if (!BWAPI::Broodwar->canBuildHere(position, b.type, b.builderUnit))
 	{
 		return false;
 	}
@@ -368,10 +368,10 @@ bool BuildingManager::canBuildHereWithSpace(BWAPI::TilePosition position, const 
 	int height(b.type.tileHeight());
 
 	// define the rectangle of the building spot
-	int startx = position.x() - buildDist;
-	int starty = position.y() - buildDist;
-	int endx = position.x() + width + buildDist;
-	int endy = position.y() + height + buildDist;
+	int startx = position.x - buildDist;
+	int starty = position.y - buildDist;
+	int endx = position.x + width + buildDist;
+	int endy = position.y + height + buildDist;
 
 
 	if (horizontalOnly)
@@ -381,7 +381,7 @@ bool BuildingManager::canBuildHereWithSpace(BWAPI::TilePosition position, const 
 	}
 
 	// if this rectangle doesn't fit on the map we can't build here
-	if (startx < 0 || starty < 0 || endx > BWAPI::Broodwar->mapWidth() || endx < position.x() + width || endy > BWAPI::Broodwar->mapHeight())
+	if (startx < 0 || starty < 0 || endx > BWAPI::Broodwar->mapWidth() || endx < position.x + width || endy > BWAPI::Broodwar->mapHeight())
 	{
 		return false;
 	}
@@ -419,7 +419,7 @@ bool BuildingManager::buildable(int x, int y, const Building & b) const
 		return false;
 	}
 
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->getUnitsOnTile(x, y))
+	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getUnitsOnTile(x, y))
 	{
 		if (unit->getType().isBuilding() && !unit->isLifted())
 		{
@@ -472,7 +472,7 @@ bool BuildingManager::isBuildingPositionExplored(const Building & b) const
 	{
 		for (int y = 0; y < b.type.tileHeight(); ++y)
 		{
-			if (!BWAPI::Broodwar->isExplored(tile.x() + x, tile.y() + y))
+			if (!BWAPI::Broodwar->isExplored(tile.x + x, tile.y + y))
 			{
 				return false;
 			}
@@ -500,10 +500,10 @@ int BuildingManager::getReservedGas() {
 /*
 void BuildingManager::drawBuildingInformation(int x, int y) {
 
-	BOOST_FOREACH(BWAPI::Unit * unit, BWAPI::Broodwar->self()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->self()->getUnits())
 	{
-		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextMap(unit->getPosition().x(), unit->getPosition().y() + 5, "\x07%d", unit->getID());
-			//BWAPI::Broodwar->drawTextMap(unit->getPosition().x(), unit->getPosition().y() + 5, "%s", unit->getOrder().getName().c_str());
+		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextMap(unit->getPosition().x, unit->getPosition().y + 5, "\x07%d", unit->getID());
+			//BWAPI::Broodwar->drawTextMap(unit->getPosition().x, unit->getPosition().y + 5, "%s", unit->getOrder().getName().c_str());
 	}
 
 	if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextScreen(x, y, "\x04 Building Information:");
@@ -527,14 +527,14 @@ void BuildingManager::drawBuildingInformation(int x, int y) {
 		Building & b = buildingData.getNextBuilding(ConstructionData::Assigned);
 
 		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextScreen(x, y + 40 + ((yspace)* 10), "\x03 %s %d", b.type.getName().c_str(), b.builderUnit->getID());
-		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextScreen(x + 150, y + 40 + ((yspace++) * 10), "\x03 A %c (%d,%d)", getBuildingWorkerCode(b), b.finalPosition.x(), b.finalPosition.y());
+		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawTextScreen(x + 150, y + 40 + ((yspace++) * 10), "\x03 A %c (%d,%d)", getBuildingWorkerCode(b), b.finalPosition.x, b.finalPosition.y);
 
-		int x1 = b.finalPosition.x() * 32;
-		int y1 = b.finalPosition.y() * 32;
-		int x2 = (b.finalPosition.x() + b.type.tileWidth()) * 32;
-		int y2 = (b.finalPosition.y() + b.type.tileHeight()) * 32;
+		int x1 = b.finalPosition.x * 32;
+		int y1 = b.finalPosition.y * 32;
+		int x2 = (b.finalPosition.x + b.type.tileWidth()) * 32;
+		int y2 = (b.finalPosition.y + b.type.tileHeight()) * 32;
 
-		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(b.builderUnit->getPosition().x(), b.builderUnit->getPosition().y(), (x1 + x2) / 2, (y1 + y2) / 2, BWAPI::Colors::Orange);
+		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawLineMap(b.builderUnit->getPosition().x, b.builderUnit->getPosition().y, (x1 + x2) / 2, (y1 + y2) / 2, BWAPI::Colors::Orange);
 		if (Options::Debug::DRAW_UALBERTABOT_DEBUG) BWAPI::Broodwar->drawBoxMap(x1, y1, x2, y2, BWAPI::Colors::Red, false);
 	}
 

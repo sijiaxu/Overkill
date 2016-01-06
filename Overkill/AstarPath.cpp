@@ -42,9 +42,9 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	std::vector<std::vector<double>> openListIndex;
 	openListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
 
-	double hValue = diag_distance(double2(endPosition.x() - startPosition.x(), endPosition.y() - startPosition.y()));
+	double hValue = diag_distance(double2(endPosition.x - startPosition.x, endPosition.y - startPosition.y));
 	openList.push(fValueGridPoint(startPosition, hValue));
-	openListIndex[startPosition.x()][startPosition.y()] = 0;
+	openListIndex[startPosition.x][startPosition.y] = 0;
 
 	//std::tr1::unordered_map<BWAPI::TilePosition, BWAPI::TilePosition> backtraceList;
 	std::vector<std::vector<BWAPI::TilePosition>> backtraceList;
@@ -55,7 +55,7 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	closeListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
 
 	//backtraceList[startPosition] = startPosition;
-	backtraceList[startPosition.x()][startPosition.y()] = startPosition;
+	backtraceList[startPosition.x][startPosition.y] = startPosition;
 
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
 	int expandRate;
@@ -97,9 +97,9 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 		loop1++;
 
 		fValueGridPoint current = openList.top();
-		closeListIndex[current.position.x()][current.position.y()] = openListIndex[current.position.x()][current.position.y()];
+		closeListIndex[current.position.x][current.position.y] = openListIndex[current.position.x][current.position.y];
 		openList.pop();
-		openListIndex[current.position.x()][current.position.y()] = -1;
+		openListIndex[current.position.x][current.position.y] = -1;
 		
 		if (!nearEndPosition)
 		{
@@ -120,32 +120,32 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 		
 		for (int i = 0; i < int(directions.size()); i++)
 		{
-			BWAPI::TilePosition nextTilePosition(current.position.x() + int(directions[i].x * expandRate), current.position.y() + int(directions[i].y * expandRate));
+			BWAPI::TilePosition nextTilePosition(current.position.x + int(directions[i].x * expandRate), current.position.y + int(directions[i].y * expandRate));
 
-			if (nextTilePosition.x() > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x() < 0 
-				|| nextTilePosition.y() > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y() < 0)
+			if (nextTilePosition.x > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x < 0 
+				|| nextTilePosition.y > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y < 0)
 			{
 				continue;
 			}
 
 			if (!isFlyer)
 			{
-				if (!BWAPI::Broodwar->isWalkable(nextTilePosition.x() * 4, nextTilePosition.y() * 4))
+				if (!BWAPI::Broodwar->isWalkable(nextTilePosition.x * 4, nextTilePosition.y * 4))
 					continue;
 				/*
 				if (nextTilePosition.getDistance(BWAPI::TilePosition(BWTA::getNearestChokepoint(nextTilePosition)->getCenter())) <= 5
 					&& BWTA::getNearestChokepoint(nextTilePosition)->getWidth() <= 5 * 32)
 				{
-					if (!BWAPI::Broodwar->isWalkable(nextTilePosition.x() * 4, nextTilePosition.y() * 4))
+					if (!BWAPI::Broodwar->isWalkable(nextTilePosition.x * 4, nextTilePosition.y * 4))
 						continue;
 				}
 				else
 				{
 					//TODO can not justify the mineral and gas position
 					bool isNearbyUnwalkable = false;
-					for (int x = nextTilePosition.x() - 2; x <= nextTilePosition.x() + 2; x++)
+					for (int x = nextTilePosition.x - 2; x <= nextTilePosition.x + 2; x++)
 					{
-						for (int y = nextTilePosition.y() - 2; y <= nextTilePosition.y() + 2; y++)
+						for (int y = nextTilePosition.y - 2; y <= nextTilePosition.y + 2; y++)
 						{
 							if (!BWAPI::Broodwar->isWalkable(x * 4, y * 4))
 							{
@@ -163,31 +163,31 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 
 			double newCost = 0;
 			if (isFlyer)
-				newCost = openListIndex[current.position.x()][current.position.y()] + expandRate + (influnceMap[nextTilePosition.x()][nextTilePosition.y()].airForce +
-				influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayAirForce + influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitAirForce +
-				influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitDecayAirForce) * expandRate * 100;
+				newCost = openListIndex[current.position.x][current.position.y] + expandRate + (influnceMap[nextTilePosition.x][nextTilePosition.y].airForce +
+				influnceMap[nextTilePosition.x][nextTilePosition.y].decayAirForce + influnceMap[nextTilePosition.x][nextTilePosition.y].enemyUnitAirForce +
+				influnceMap[nextTilePosition.x][nextTilePosition.y].enemyUnitDecayAirForce) * expandRate * 100;
 			else
-				newCost = openListIndex[current.position.x()][current.position.y()] + expandRate; /*+ (influnceMap[nextTilePosition.x()][nextTilePosition.y()].groundForce +
-				influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayGroundForce + influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitGroundForce +
-				influnceMap[nextTilePosition.x()][nextTilePosition.y()].enemyUnitDecayGroundForce) * expandRate;*/
+				newCost = openListIndex[current.position.x][current.position.y] + expandRate; /*+ (influnceMap[nextTilePosition.x][nextTilePosition.y].groundForce +
+				influnceMap[nextTilePosition.x][nextTilePosition.y].decayGroundForce + influnceMap[nextTilePosition.x][nextTilePosition.y].enemyUnitGroundForce +
+				influnceMap[nextTilePosition.x][nextTilePosition.y].enemyUnitDecayGroundForce) * expandRate;*/
 
 			//if point have already been expand(if our heuristic function is admissible, this will not happen)
-			if (closeListIndex[nextTilePosition.x()][nextTilePosition.y()] != -1 && closeListIndex[nextTilePosition.x()][nextTilePosition.y()] > newCost)
-				closeListIndex[nextTilePosition.x()][nextTilePosition.y()] = -1;
+			if (closeListIndex[nextTilePosition.x][nextTilePosition.y] != -1 && closeListIndex[nextTilePosition.x][nextTilePosition.y] > newCost)
+				closeListIndex[nextTilePosition.x][nextTilePosition.y] = -1;
 			// if point have already in open point, check the cost value
 			// since std::priority_queue do not have increase-priority interface, so we push the same position twice into the open list 
-			if (openListIndex[nextTilePosition.x()][nextTilePosition.y()] != -1 && openListIndex[nextTilePosition.x()][nextTilePosition.y()] > newCost)
-				openListIndex[nextTilePosition.x()][nextTilePosition.y()] = -1;
+			if (openListIndex[nextTilePosition.x][nextTilePosition.y] != -1 && openListIndex[nextTilePosition.x][nextTilePosition.y] > newCost)
+				openListIndex[nextTilePosition.x][nextTilePosition.y] = -1;
 
-			if (openListIndex[nextTilePosition.x()][nextTilePosition.y()] == -1 && closeListIndex[nextTilePosition.x()][nextTilePosition.y()] == -1)
+			if (openListIndex[nextTilePosition.x][nextTilePosition.y] == -1 && closeListIndex[nextTilePosition.x][nextTilePosition.y] == -1)
 			{
 				loop2++;
 				double fvalue;
-				fvalue = newCost + diag_distance(double2(endPosition.x() - nextTilePosition.x(), endPosition.y() - nextTilePosition.y()));
+				fvalue = newCost + diag_distance(double2(endPosition.x - nextTilePosition.x, endPosition.y - nextTilePosition.y));
 
 				openList.push(fValueGridPoint(nextTilePosition, fvalue));
-				openListIndex[nextTilePosition.x()][nextTilePosition.y()] = newCost;
-				backtraceList[nextTilePosition.x()][nextTilePosition.y()] = current.position;
+				openListIndex[nextTilePosition.x][nextTilePosition.y] = newCost;
+				backtraceList[nextTilePosition.x][nextTilePosition.y] = current.position;
 			}
 		}
 
@@ -208,8 +208,8 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	pathFind.push_front(backPosition);
 	while (backPosition != startPosition)
 	{
-		pathFind.push_front(backtraceList[backPosition.x()][backPosition.y()]);
-		backPosition = backtraceList[backPosition.x()][backPosition.y()];
+		pathFind.push_front(backtraceList[backPosition.x][backPosition.y]);
+		backPosition = backtraceList[backPosition.x][backPosition.y];
 	}
 
 	if (isFlyer)
@@ -222,8 +222,8 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 				std::list<BWAPI::TilePosition>::iterator it3 = it2;
 				if (++it3 != pathFind.end())
 				{
-					double2 firstVector(it2->x() - it->x(), it2->y() - it->y());
-					double2 secondVector(it3->x() - it2->x(), it3->y() - it2->y());
+					double2 firstVector(it2->x - it->x, it2->y - it->y);
+					double2 secondVector(it3->x - it2->x, it3->y - it2->y);
 					double cosValue = (firstVector.x * secondVector.x + firstVector.y * secondVector.y) / (firstVector.len() * secondVector.len());
 					double divergeDegree = std::acos(cosValue) * 180.0 / 3.14159265;
 

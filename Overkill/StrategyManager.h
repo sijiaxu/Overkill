@@ -73,5 +73,5 @@ public:
 	int							getStrategyByName(std::string strategy);
 	std::string					getStrategyName(openingStrategy strategy);
 	std::vector<std::string>	getStrategyNameArray() { return openingStrategyName; }
-	int							getScore(BWAPI::Player * player);
+	int							getScore(BWAPI::Player player);
 };

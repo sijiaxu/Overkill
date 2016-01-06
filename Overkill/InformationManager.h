@@ -12,13 +12,13 @@
 
 struct buildingInfo
 {
-	BWAPI::Unit*	unit;
+	BWAPI::Unit	unit;
 	BWAPI::UnitType unitType;
 	BWAPI::TilePosition initPosition;
 	//TODO: check for cheating build
 	bool			isComplete;
 
-	buildingInfo(BWAPI::Unit* u, BWAPI::TilePosition p, bool completeFlag, BWAPI::UnitType ut)
+	buildingInfo(BWAPI::Unit u, BWAPI::TilePosition p, bool completeFlag, BWAPI::UnitType ut)
 	{
 		unit = u;
 		initPosition = p;
@@ -66,32 +66,32 @@ class InformationManager {
 	InformationManager();
 
 	//self info;
-	BWAPI::Unit*						selfBaseUnit;
+	BWAPI::Unit						selfBaseUnit;
 	BWAPI::Position						selfNaturalChokePoint;
 
 	BWAPI::TilePosition					selfStartBaseLocation;
 	BWAPI::TilePosition					selfNaturalBaseLocation;
-	std::set<BWAPI::Unit*>				selfAllBase;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>		selfAllBuilding;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>		selfAllBattleUnit;
+	std::set<BWAPI::Unit>				selfAllBase;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>		selfAllBuilding;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>		selfAllBattleUnit;
 
 	//enemy info
 	BWAPI::TilePosition					enemyStartBaseLocation;
 	BWAPI::TilePosition					enemyNaturalBaseLocation;
-	std::set<BWAPI::Unit*>				enemyAllBase;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>			enemyAllBuilding;
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>			enemyAllBattleUnit;
+	std::set<BWAPI::Unit>				enemyAllBase;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>			enemyAllBuilding;
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>			enemyAllBattleUnit;
 
 	//occupied region
 	std::set<BWTA::Region *>			occupiedRegions[2];
 
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>> selfOccupiedDetail;
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>> enemyOccupiedDetail;
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>> selfOccupiedDetail;
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>> enemyOccupiedDetail;
 
 	//first Creep_Colony location
 	BWAPI::TilePosition					firstColonyLocation;
 
-	void							updateUnit(BWAPI::Unit * unit);
+	void							updateUnit(BWAPI::Unit unit);
 	bool							defendTrig;
 	bool							depotBalanceFlag;
 	int								waitforDepotTime;
@@ -100,7 +100,7 @@ class InformationManager {
 	int								waitTime;
 
 	void							checkSelfNewDepotFinish();
-	std::map<BWAPI::Unit*, bool>	depotTrigMap;
+	std::map<BWAPI::Unit, bool>	depotTrigMap;
 
 	void							checkEarlyRush();
 	bool							zealotRushFlag;
@@ -118,7 +118,7 @@ class InformationManager {
 	int								defendAddSupply;
 	
 	std::vector<std::vector<gridInfo>>			enemyInfluenceMap;
-	void							addUnitInfluenceMap(BWAPI::Unit * unit, bool addOrdestroy);
+	void							addUnitInfluenceMap(BWAPI::Unit unit, bool addOrdestroy);
 	void							updateEnemyUnitInfluenceMap();
 
 	int								waitToBuildSunker;
@@ -137,39 +137,39 @@ class InformationManager {
 public:
 	void							setLocationEnemyBase(BWAPI::TilePosition Here);
 
-	void							updateOccupiedRegions(BWTA::Region * region, BWAPI::Player * player);
-	void							addOccupiedRegionsDetail(BWTA::Region * region, BWAPI::Player * player, BWAPI::Unit* building);
-	void							destroyOccupiedRegionsDetail(BWTA::Region * region, BWAPI::Player * player, BWAPI::Unit* building);
+	void							updateOccupiedRegions(BWTA::Region * region, BWAPI::Player player);
+	void							addOccupiedRegionsDetail(BWTA::Region * region, BWAPI::Player player, BWAPI::Unit building);
+	void							destroyOccupiedRegionsDetail(BWTA::Region * region, BWAPI::Player player, BWAPI::Unit building);
 	void							checkOccupiedDetail();
 
-	BWAPI::Unit*					GetOurBaseUnit();
+	BWAPI::Unit						GetOurBaseUnit();
 	BWAPI::Position					GetEnemyBasePosition();
 	BWAPI::Position					GetEnemyNaturalPosition();
 
 	BWAPI::TilePosition				GetNextExpandLocation();
-	std::set<BWTA::Region *> &		getOccupiedRegions(BWAPI::Player * player);
+	std::set<BWTA::Region *> &		getOccupiedRegions(BWAPI::Player player);
 	
 	BWAPI::TilePosition				getOurNatrualLocation();
 	BWAPI::TilePosition				getOurFirstColonyLocation() { return firstColonyLocation; }
 
-	std::set<BWAPI::Unit*>&			getOurAllBaseUnit() { return selfAllBase; }
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& getOurAllBattleUnit() { return selfAllBattleUnit; }
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& getOurAllBuildingUnit() { return selfAllBuilding; }
+	std::set<BWAPI::Unit>&			getOurAllBaseUnit() { return selfAllBase; }
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBattleUnit() { return selfAllBattleUnit; }
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBuildingUnit() { return selfAllBuilding; }
 
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& getEnemyAllBattleUnit() { return enemyAllBattleUnit; }
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit*>>& getEnemyAllBuildingUnit() { return enemyAllBuilding; }
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBattleUnit() { return enemyAllBattleUnit; }
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBuildingUnit() { return enemyAllBuilding; }
 	std::vector<std::vector<gridInfo>>& getEnemyInfluenceMap() { return enemyInfluenceMap; }
 
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& getEnemyOccupiedDetail() { return enemyOccupiedDetail; }
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& getSelfOccupiedDetail() { return selfOccupiedDetail; }
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& getEnemyOccupiedDetail() { return enemyOccupiedDetail; }
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& getSelfOccupiedDetail() { return selfOccupiedDetail; }
 
 	BWAPI::TilePosition				getSunkenBuildingPosition();
 	void							addWaitBuildSunkun(int count) { waitToBuildSunker += count; }
 	bool							getEnemyEarlyRushSuccess() { return enemyEarlyRushSuccess; }
 
-	void							onUnitShow(BWAPI::Unit * unit);
-	void							onUnitMorph(BWAPI::Unit * unit);
-	void							onUnitDestroy(BWAPI::Unit * unit);
+	void							onUnitShow(BWAPI::Unit unit);
+	void							onUnitMorph(BWAPI::Unit unit);
+	void							onUnitDestroy(BWAPI::Unit unit);
 
 	bool							isEarlyRush() { return earlyRush; }
 

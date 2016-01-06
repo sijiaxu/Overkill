@@ -10,15 +10,15 @@ void HydraliskArmy::attack(BWAPI::Position targetPosition)
 
 	BOOST_FOREACH(UnitState u, units)
 	{
-		BWAPI::Unit* unit = u.unit;
-		std::set<BWAPI::Unit*> enemySet = unit->getUnitsInRadius(12 * 32);
+		BWAPI::Unit unit = u.unit;
+		BWAPI::Unitset enemySet = unit->getUnitsInRadius(12 * 32);
 
 		int closetDist = 99999;
 		int highPriority = 0;
-		BWAPI::Unit* closet = NULL;
+		BWAPI::Unit closet = NULL;
 
 		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy())
 			{
@@ -51,7 +51,7 @@ void HydraliskArmy::defend(BWAPI::Position targetPosition)
 }
 
 
-int HydraliskArmy::getAttackPriority(BWAPI::Unit * unit)
+int HydraliskArmy::getAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 

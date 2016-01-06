@@ -26,8 +26,8 @@ class MutaliskHarassTactic : public BattleTactic
 	BWAPI::Position			groupPosition;
 
 	Timer					t;
-	std::map<BWAPI::Unit*, std::list<BWAPI::TilePosition>> unitMovePath;
-	std::set<BWAPI::Unit*>	moveComplete;
+	std::map<BWAPI::Unit, std::list<BWAPI::TilePosition>> unitMovePath;
+	std::set<BWAPI::Unit>	moveComplete;
 	BWAPI::Position			moveTarget;
 	int						moveFinishCount;
 	int						triggerChangeTime;
@@ -39,10 +39,10 @@ public:
 
 	virtual void			update();
 	bool					isTacticEnd();
-	virtual void			onUnitShow(BWAPI::Unit* unit);
+	virtual void			onUnitShow(BWAPI::Unit unit);
 	virtual void			setAttackPosition(BWAPI::Position targetPosition);
 	virtual bool			hasEnemy();
-	virtual void			addArmyUnit(BWAPI::Unit* unit);
+	virtual void			addArmyUnit(BWAPI::Unit unit);
 
 	void					generateAttackPath(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition);
 	int						needRetreat();

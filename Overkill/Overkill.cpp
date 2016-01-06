@@ -23,8 +23,8 @@ void Overkill::readHistoryFile()
 		historyFile.close();
 
 		//default opening strategy
-		chooseOpeningStrategy = TenHatchMuta;
-		StrategyManager::Instance().setOpeningStrategy(TenHatchMuta);
+		chooseOpeningStrategy = NinePoolling;
+		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
 
 		/*
 		if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
@@ -60,7 +60,7 @@ void Overkill::readHistoryFile()
 
 		//do UCB1 calculate, and set the opening strategy
 		std::map<std::string, std::pair<int, int>> strategyResults;
-		BOOST_FOREACH(std::vector<string> record, historyInfo)
+		for (auto record : historyInfo)
 		{
 			//win
 			if (record[2] == "1")
@@ -75,28 +75,30 @@ void Overkill::readHistoryFile()
 
 		double experimentCount = historyInfo.size();
 		std::map<std::string, double> strategyUCB;
-		BOOST_FOREACH(std::string opening, StrategyManager::Instance().getStrategyNameArray())
+		for(auto opening : StrategyManager::Instance().getStrategyNameArray())
 		{
 			strategyUCB[opening] = 99999;
 		}
 
-		for (std::map<std::string, std::pair<int, int>>::iterator it = strategyResults.begin(); it != strategyResults.end(); it++)
+		//for (std::map<std::string, std::pair<int, int>>::iterator it = strategyResults.begin(); it != strategyResults.end(); it++)
+		for (auto it : strategyResults)
 		{
-			double strategyExpectation = double(it->second.first) / (it->second.first + it->second.second);
-			double uncertainty = 0.7 * std::sqrt(std::log(experimentCount) / (it->second.first + it->second.second));
-			strategyUCB[it->first] = strategyExpectation + uncertainty;
+			double strategyExpectation = double(it.second.first) / (it.second.first + it.second.second);
+			double uncertainty = 0.7 * std::sqrt(std::log(experimentCount) / (it.second.first + it.second.second));
+			strategyUCB[it.first] = strategyExpectation + uncertainty;
 		}
 		
 		std::string maxUCBStrategy;
 		double maxUCB = 0;
-		for (std::map<std::string, double>::iterator it = strategyUCB.begin(); it != strategyUCB.end(); it++)
+		//for (std::map<std::string, double>::iterator it = strategyUCB.begin(); it != strategyUCB.end(); it++)
+		for (auto it : strategyUCB)
 		{
-			if (it->second > maxUCB)
+			if (it.second > maxUCB)
 			{
-				maxUCBStrategy = it->first;
-				maxUCB = it->second;
+				maxUCBStrategy = it.first;
+				maxUCB = it.second;
 			}
-			BWAPI::Broodwar->printf("%s , UCB: %.4f", it->first.c_str(), it->second);
+			BWAPI::Broodwar->printf("%s , UCB: %.4f", it.first.c_str(), it.second);
 		}
 
 		BWAPI::Broodwar->printf("choose %s opening", maxUCBStrategy.c_str());
@@ -147,9 +149,9 @@ void Overkill::writeCurrentPlay(bool isWin)
 		}
 	}
 
-	BOOST_FOREACH(std::vector<string> record, historyInfo)
+	for (auto record : historyInfo)
 	{
-		BOOST_FOREACH(std::string field, record)
+		for (auto field : record)
 		{
 			historyFile << field << "|";
 		}
@@ -162,7 +164,7 @@ void Overkill::writeCurrentPlay(bool isWin)
 
 void Overkill::onStart()
 {
-	Broodwar->setLocalSpeed(0);
+	Broodwar->setLocalSpeed(10);
 	BWAPI::Broodwar->sendText("gl hf :)");
 
 	//Broodwar->printf("The map is %s, a %d player map", Broodwar->mapName().c_str(), Broodwar->getStartLocations().size());
@@ -176,7 +178,7 @@ void Overkill::onStart()
 
 	BWTA::analyze();
 
-	BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+	for (auto & u : BWAPI::Broodwar->self()->getUnits())
 	{
 		if (u->getType().isResourceDepot())
 			InformationManager::Instance().addOccupiedRegionsDetail(BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation()), BWAPI::Broodwar->self(), u);
@@ -225,16 +227,15 @@ void Overkill::onFrame()
 	drawStats();
 
 	/*
-	BOOST_FOREACH(BWAPI::Unit* enemy, BWAPI::Broodwar->enemy()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit enemy, BWAPI::Broodwar->enemy()->getUnits())
 	{
 		if (!enemy->isGatheringMinerals())
 		{
-			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x(), enemy->getPosition().y(), 8, BWAPI::Colors::Blue, true);
+			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x, enemy->getPosition().y, 8, BWAPI::Colors::Blue, true);
 		}
 		else
-			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x(), enemy->getPosition().y(), 8, BWAPI::Colors::Red, true);
+			BWAPI::Broodwar->drawCircleMap(enemy->getPosition().x, enemy->getPosition().y, 8, BWAPI::Colors::Red, true);
 	}*/
-
 
 
 	TimerManager::Instance().startTimer(TimerManager::All);
@@ -325,26 +326,27 @@ void Overkill::onSendText(std::string text)
 
 void Overkill::drawPaths()
 {
-	for (set<Unit*>::const_iterator it = Broodwar->self()->getUnits().begin(); it != Broodwar->self()->getUnits().end(); it++) 
+	//for (set<Unit*>::const_iterator it = BWAPI::Broodwar->self()->getUnits().begin(); it != Broodwar->self()->getUnits().end(); it++) 
+	for (auto unit : BWAPI::Broodwar->self()->getUnits())
 	{
-		if ((*it)->getType() != UnitTypes::Protoss_Interceptor) 
+		if (unit->getType() != UnitTypes::Protoss_Interceptor)
 		{
-			Position point1 = (*it)->getPosition();
-			Position point2 = (*it)->getTargetPosition();
+			BWAPI::Position point1 = unit->getPosition();
+			BWAPI::Position point2 = unit->getTargetPosition();
 
 			Color color = Colors::Cyan;
-			if ((*it)->getOrder() == Orders::AttackUnit) 
+			if (unit->getOrder() == Orders::AttackUnit)
 			{
 				color = Colors::Red;
 			}
 
-			Broodwar->drawLine(CoordinateType::Map, point1.x(), point1.y(), point2.x(), point2.y(), color);
+			Broodwar->drawLine(CoordinateType::Map, point1.x, point1.y, point2.x, point2.y, color);
 
 			/*
 			if ((*it)->getType().isWorker() && (*it)->getOrder() == Orders::PlaceBuilding)
 			{
-				int x = (*it)->getTargetPosition().x() - ((*it)->getBuildType().tileWidth()*TILE_SIZE) / 2;
-				int y = (*it)->getTargetPosition().y() - ((*it)->getBuildType().tileHeight()*TILE_SIZE) / 2;
+				int x = (*it)->getTargetPosition().x - ((*it)->getBuildType().tileWidth()*TILE_SIZE) / 2;
+				int y = (*it)->getTargetPosition().y - ((*it)->getBuildType().tileHeight()*TILE_SIZE) / 2;
 
 				Broodwar->drawBoxMap(x, y, x + (*it)->getBuildType().tileWidth()*TILE_SIZE, y + (*it)->getBuildType().tileHeight()*TILE_SIZE, Colors::Green);
 			}*/
@@ -356,22 +358,22 @@ void Overkill::drawPaths()
 void Overkill::onNukeDetect(BWAPI::Position target)
 {
 	if (target != Positions::Unknown)
-		Broodwar->printf("Nuclear Launch Detected at (%d,%d)", target.x(), target.y());
+		Broodwar->printf("Nuclear Launch Detected at (%d,%d)", target.x, target.y);
 	else
 		Broodwar->printf("Nuclear Launch Detected");
 }
 
-void Overkill::onUnitDiscover(BWAPI::Unit* unit)
+void Overkill::onUnitDiscover(BWAPI::Unit unit)
 {
 
 }
 
-void Overkill::onUnitEvade(BWAPI::Unit* unit)
+void Overkill::onUnitEvade(BWAPI::Unit unit)
 {
 
 }
 
-void Overkill::onUnitShow(BWAPI::Unit* unit)
+void Overkill::onUnitShow(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
 		return;
@@ -387,17 +389,17 @@ void Overkill::onUnitShow(BWAPI::Unit* unit)
 	}
 }
 
-void Overkill::onUnitHide(BWAPI::Unit* unit)
+void Overkill::onUnitHide(BWAPI::Unit unit)
 {
 	
 }
 
-void Overkill::onUnitCreate(BWAPI::Unit* unit)
+void Overkill::onUnitCreate(BWAPI::Unit unit)
 {
 
 }
 
-void Overkill::onUnitDestroy(BWAPI::Unit* unit)
+void Overkill::onUnitDestroy(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
 		return;
@@ -421,7 +423,7 @@ void Overkill::onUnitDestroy(BWAPI::Unit* unit)
 	}
 }
 
-void Overkill::onUnitMorph(BWAPI::Unit* unit)
+void Overkill::onUnitMorph(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
 		return;
@@ -439,7 +441,7 @@ void Overkill::onUnitMorph(BWAPI::Unit* unit)
 }
 
 
-void Overkill::onUnitComplete(BWAPI::Unit *unit)
+void Overkill::onUnitComplete(BWAPI::Unit unit)
 {
 
 }
@@ -449,7 +451,7 @@ DWORD WINAPI AnalyzeThread()
 {
 	BWTA::analyze();
 
-	BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->self()->getUnits())
+	BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
 	{
 		if (u->getType().isResourceDepot())
 			InformationManager::Instance().addOccupiedRegionsDetail(BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation()), BWAPI::Broodwar->self(), u);
@@ -462,26 +464,27 @@ DWORD WINAPI AnalyzeThread()
 
 void Overkill::drawStats()
 {
-	std::set<Unit*> myUnits = Broodwar->self()->getUnits();
+	BWAPI::Unitset myUnits = BWAPI::Broodwar->self()->getUnits();
 	Broodwar->drawTextScreen(5, 0, "I have %d units:", myUnits.size());
 	std::map<UnitType, int> unitTypeCounts;
-	for (std::set<Unit*>::iterator i = myUnits.begin(); i != myUnits.end(); i++)
+	//for (std::set<Unit*>::iterator i = myUnits.begin(); i != myUnits.end(); i++)
+	for (auto unit : myUnits)
 	{
-		if (!(*i)->getType().isBuilding() && (*i)->getType().canAttack())
+		if (!unit->getType().isBuilding() && unit->getType().canAttack())
 		{
-			int unitWidth = (*i)->getType().tileWidth() * 32;
-			int unitHeight = (*i)->getType().tileHeight() * 32 / 8;
-			BWAPI::Position unitPosition = (*i)->getPosition();
-			BWAPI::Broodwar->drawBoxMap(unitPosition.x() - unitWidth / 2, unitPosition.y() + unitHeight / 2, unitPosition.x() + unitWidth / 2, unitPosition.y() - unitHeight / 2, BWAPI::Colors::Red, true);
-			double healthPercent = double((*i)->getHitPoints()) / (*i)->getType().maxHitPoints();
-			BWAPI::Broodwar->drawBoxMap(unitPosition.x() - unitWidth / 2, unitPosition.y() + unitHeight / 2, unitPosition.x() - unitWidth / 2 + int(unitWidth * healthPercent), unitPosition.y() - unitHeight / 2, BWAPI::Colors::Green, true);
+			int unitWidth = unit->getType().tileWidth() * 32;
+			int unitHeight = unit->getType().tileHeight() * 32 / 8;
+			BWAPI::Position unitPosition = unit->getPosition();
+			BWAPI::Broodwar->drawBoxMap(unitPosition.x - unitWidth / 2, unitPosition.y + unitHeight / 2, unitPosition.x + unitWidth / 2, unitPosition.y - unitHeight / 2, BWAPI::Colors::Red, true);
+			double healthPercent = double(unit->getHitPoints()) / unit->getType().maxHitPoints();
+			BWAPI::Broodwar->drawBoxMap(unitPosition.x - unitWidth / 2, unitPosition.y + unitHeight / 2, unitPosition.x - unitWidth / 2 + int(unitWidth * healthPercent), unitPosition.y - unitHeight / 2, BWAPI::Colors::Green, true);
 		}
 
-		if (unitTypeCounts.find((*i)->getType()) == unitTypeCounts.end())
+		if (unitTypeCounts.find(unit->getType()) == unitTypeCounts.end())
 		{
-			unitTypeCounts.insert(std::make_pair((*i)->getType(), 0));
+			unitTypeCounts.insert(std::make_pair(unit->getType(), 0));
 		}
-		unitTypeCounts.find((*i)->getType())->second++;
+		unitTypeCounts.find(unit->getType())->second++;
 	}
 	int line = 1;
 	for (std::map<UnitType, int>::iterator i = unitTypeCounts.begin(); i != unitTypeCounts.end(); i++)
@@ -490,29 +493,31 @@ void Overkill::drawStats()
 		line++;
 	}
 	// draw the map tile position at map
-	Broodwar->drawTextScreen(Broodwar->getMousePosition().x() + 20, Broodwar->getMousePosition().y() + 20, "%d %d", (Broodwar->getScreenPosition().x() + Broodwar->getMousePosition().x()) / TILE_SIZE, (Broodwar->getScreenPosition().y() + Broodwar->getMousePosition().y()) / TILE_SIZE);
+	Broodwar->drawTextScreen(BWAPI::Broodwar->getMousePosition().x + 20, BWAPI::Broodwar->getMousePosition().y + 20, "%d %d", (BWAPI::Broodwar->getScreenPosition().x + BWAPI::Broodwar->getMousePosition().x) / TILE_SIZE, (BWAPI::Broodwar->getScreenPosition().y + BWAPI::Broodwar->getMousePosition().y) / TILE_SIZE);
 }
 
 void Overkill::drawBullets()
 {
-	std::set<Bullet*> bullets = Broodwar->getBullets();
-	for (std::set<Bullet*>::iterator i = bullets.begin(); i != bullets.end(); i++)
+	BWAPI::Bulletset bullets = Broodwar->getBullets();
+	//for (std::set<Bullet*>::iterator i = bullets.begin(); i != bullets.end(); i++)
+	for (auto bullet : bullets)
 	{
-		Position p = (*i)->getPosition();
-		double velocityX = (*i)->getVelocityX();
-		double velocityY = (*i)->getVelocityY();
-		if ((*i)->getPlayer() == Broodwar->self())
+		Position p = bullet->getPosition();
+		double velocityX = bullet->getVelocityX();
+		double velocityY = bullet->getVelocityY();
+		if (bullet->getPlayer() == Broodwar->self())
 		{
-			Broodwar->drawLineMap(p.x(), p.y(), p.x() + (int)velocityX, p.y() + (int)velocityY, Colors::Green);
-			Broodwar->drawTextMap(p.x(), p.y(), "\x07%s", (*i)->getType().getName().c_str());
+			Broodwar->drawLineMap(p.x, p.y, p.x + (int)velocityX, p.y + (int)velocityY, Colors::Green);
+			Broodwar->drawTextMap(p.x, p.y, "\x07%s", bullet->getType().getName().c_str());
 		}
 		else
 		{
-			Broodwar->drawLineMap(p.x(), p.y(), p.x() + (int)velocityX, p.y() + (int)velocityY, Colors::Red);
-			Broodwar->drawTextMap(p.x(), p.y(), "\x06%s", (*i)->getType().getName().c_str());
+			Broodwar->drawLineMap(p.x, p.y, p.x + (int)velocityX, p.y + (int)velocityY, Colors::Red);
+			Broodwar->drawTextMap(p.x, p.y, "\x06%s", bullet->getType().getName().c_str());
 		}
 	}
 }
+
 
 void Overkill::drawVisibilityData()
 {
@@ -533,81 +538,89 @@ void Overkill::drawVisibilityData()
 	}
 }
 
+
 void Overkill::drawTerrainData()
 {
 	Broodwar->drawTextScreen(5, 0, "\x04Starts: %d Bases: %d Enemy: %s Frames: %d (%d:%s%d) Map: %s", BWTA::getStartLocations().size(), BWTA::getBaseLocations().size(), Broodwar->enemy()->getRace().getName().c_str(), Broodwar->getFrameCount(), Broodwar->elapsedTime() / 60, (Broodwar->elapsedTime() % 60 < 10) ? "0" : "", Broodwar->elapsedTime() % 60, Broodwar->mapName().c_str());
 
 	//we will iterate through all the base locations, and draw their outlines.
-	for (std::set<BWTA::BaseLocation*>::const_iterator i = BWTA::getBaseLocations().begin(); i != BWTA::getBaseLocations().end(); i++)
+	//for (std::set<BWTA::BaseLocation*>::const_iterator i = BWTA::getBaseLocations().begin(); i != BWTA::getBaseLocations().end(); i++)
+	for (auto i : BWTA::getBaseLocations())
 	{
-		TilePosition p = (*i)->getTilePosition();
-		Position c = (*i)->getPosition();
+		TilePosition p = i->getTilePosition();
+		Position c = i->getPosition();
 
 		//draw outline of center location
-		Broodwar->drawBox(CoordinateType::Map, p.x() * 32, p.y() * 32, p.x() * 32 + 4 * 32, p.y() * 32 + 3 * 32, Colors::Blue, false);
+		Broodwar->drawBox(CoordinateType::Map, p.x * 32, p.y * 32, p.x * 32 + 4 * 32, p.y * 32 + 3 * 32, Colors::Blue, false);
 
 		//draw a circle at each mineral patch
-		for (std::set<BWAPI::Unit*>::const_iterator j = (*i)->getStaticMinerals().begin(); j != (*i)->getStaticMinerals().end(); j++)
+		for (auto j : i->getStaticMinerals())
 		{
-			Position q = (*j)->getInitialPosition();
-			Broodwar->drawCircle(CoordinateType::Map, q.x(), q.y(), 30, Colors::Cyan, false);
+			Position q = j->getInitialPosition();
+			Broodwar->drawCircle(CoordinateType::Map, q.x, q.y, 30, Colors::Cyan, false);
 		}
 
 		//draw the outlines of vespene geysers
-		for (std::set<BWAPI::Unit*>::const_iterator j = (*i)->getGeysers().begin(); j != (*i)->getGeysers().end(); j++)
+		//for (std::set<BWAPI::Unit>::const_iterator j = (*i)->getGeysers().begin(); j != (*i)->getGeysers().end(); j++)
+		for (auto j : i->getGeysers())
 		{
-			TilePosition q = (*j)->getInitialTilePosition();
-			Broodwar->drawBox(CoordinateType::Map, q.x() * 32, q.y() * 32, q.x() * 32 + 4 * 32, q.y() * 32 + 2 * 32, Colors::Orange, false);
+			TilePosition q = j->getInitialTilePosition();
+			Broodwar->drawBox(CoordinateType::Map, q.x * 32, q.y * 32, q.x * 32 + 4 * 32, q.y * 32 + 2 * 32, Colors::Orange, false);
 		}
 
 		//if this is an island expansion, draw a yellow circle around the base location
-		if ((*i)->isIsland())
-			Broodwar->drawCircle(CoordinateType::Map, c.x(), c.y(), 80, Colors::Yellow, false);
+		if (i->isIsland())
+			Broodwar->drawCircle(CoordinateType::Map, c.x, c.y, 80, Colors::Yellow, false);
 	}
 
 	//we will iterate through all the regions and draw the polygon outline of it in green.
-	for (std::set<BWTA::Region*>::const_iterator r = BWTA::getRegions().begin(); r != BWTA::getRegions().end(); r++)
+	//for (std::set<BWTA::Region*>::const_iterator r = BWTA::getRegions().begin(); r != BWTA::getRegions().end(); r++)
+	for (auto r : BWTA::getRegions())
 	{
-		BWTA::Polygon p = (*r)->getPolygon();
+		BWTA::Polygon p = r->getPolygon();
 		for (int j = 0; j<(int)p.size(); j++)
 		{
 			Position point1 = p[j];
 			Position point2 = p[(j + 1) % p.size()];
-			Broodwar->drawLine(CoordinateType::Map, point1.x(), point1.y(), point2.x(), point2.y(), Colors::Green);
+			Broodwar->drawLine(CoordinateType::Map, point1.x, point1.y, point2.x, point2.y, Colors::Green);
 		}
 	}
 
 	//we will visualize the chokepoints with red lines
-	for (std::set<BWTA::Region*>::const_iterator r = BWTA::getRegions().begin(); r != BWTA::getRegions().end(); r++)
+	//for (std::set<BWTA::Region*>::const_iterator r = BWTA::getRegions().begin(); r != BWTA::getRegions().end(); r++)
+	for (auto r : BWTA::getRegions())
 	{
-		for (std::set<BWTA::Chokepoint*>::const_iterator c = (*r)->getChokepoints().begin(); c != (*r)->getChokepoints().end(); c++)
+		//for (std::set<BWTA::Chokepoint*>::const_iterator c = (*r)->getChokepoints().begin(); c != (*r)->getChokepoints().end(); c++)
+		for (auto c : r->getChokepoints())
 		{
-			Position point1 = (*c)->getSides().first;
-			Position point2 = (*c)->getSides().second;
-			Broodwar->drawLine(CoordinateType::Map, point1.x(), point1.y(), point2.x(), point2.y(), Colors::Red);
+			Position point1 = c->getSides().first;
+			Position point2 = c->getSides().second;
+			Broodwar->drawLine(CoordinateType::Map, point1.x, point1.y, point2.x, point2.y, Colors::Red);
 		}
 	}
 }
 
+
 void Overkill::showPlayers()
 {
-	std::set<Player*> players = Broodwar->getPlayers();
-	for (std::set<Player*>::iterator i = players.begin(); i != players.end(); i++)
+	BWAPI::Playerset players = Broodwar->getPlayers();
+	//for (std::set<Player*>::iterator i = players.begin(); i != players.end(); i++)
+	for (auto i : players)
 	{
-		Broodwar->printf("Player [%d]: %s is in force: %s", (*i)->getID(), (*i)->getName().c_str(), (*i)->getForce()->getName().c_str());
+		Broodwar->printf("Player [%d]: %s is in force: %s", i->getID(), i->getName().c_str(), i->getForce()->getName().c_str());
 	}
 }
 
 void Overkill::showForces()
 {
-	std::set<Force*> forces = Broodwar->getForces();
-	for (std::set<Force*>::iterator i = forces.begin(); i != forces.end(); i++)
+	BWAPI::Forceset forces = Broodwar->getForces();
+	for (auto i : forces)
 	{
-		std::set<Player*> players = (*i)->getPlayers();
-		Broodwar->printf("Force %s has the following players:", (*i)->getName().c_str());
-		for (std::set<Player*>::iterator j = players.begin(); j != players.end(); j++)
+		BWAPI::Playerset players = i->getPlayers();
+		Broodwar->printf("Force %s has the following players:", i->getName().c_str());
+		for (auto j : players)
 		{
-			Broodwar->printf("  - Player [%d]: %s", (*j)->getID(), (*j)->getName().c_str());
+			Broodwar->printf("  - Player [%d]: %s", j->getID(), j->getName().c_str());
 		}
 	}
 }

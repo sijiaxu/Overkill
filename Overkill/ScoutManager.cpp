@@ -37,7 +37,7 @@ ScoutManager::ScoutManager()
 	moveDirections.push_back(direct8);
 }
 
-void ScoutManager::addScoutUnit(BWAPI::Unit* unit)
+void ScoutManager::addScoutUnit(BWAPI::Unit unit)
 {
 	if (unit->getPlayer() == BWAPI::Broodwar->self())
 	{
@@ -47,7 +47,7 @@ void ScoutManager::addScoutUnit(BWAPI::Unit* unit)
 }
 
 
-void ScoutManager::onUnitMorph(BWAPI::Unit * unit)
+void ScoutManager::onUnitMorph(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && unit->getPlayer() == BWAPI::Broodwar->self())
 	{
@@ -57,7 +57,7 @@ void ScoutManager::onUnitMorph(BWAPI::Unit * unit)
 }
 
 
-void ScoutManager::onUnitShow(BWAPI::Unit* unit)
+void ScoutManager::onUnitShow(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && unit->getPlayer() == BWAPI::Broodwar->self())
 	{
@@ -66,12 +66,12 @@ void ScoutManager::onUnitShow(BWAPI::Unit* unit)
 	}
 }
 
-std::vector<BWAPI::Unit*> ScoutManager::getOverLordArmy(int count)
+std::vector<BWAPI::Unit> ScoutManager::getOverLordArmy(int count)
 {
 	if (int(overLordIdle.size()) < count)
-		return std::vector<BWAPI::Unit*>();
+		return std::vector<BWAPI::Unit>();
 
-	std::vector<BWAPI::Unit*> overlordArmy;
+	std::vector<BWAPI::Unit> overlordArmy;
 	for (std::vector<Scout>::iterator it = overLordIdle.begin(); it != overLordIdle.end();)
 	{
 		if (count > 0)
@@ -95,7 +95,7 @@ void ScoutManager::giveBackOverLordArmy(BattleArmy* army)
 }
 
 
-void ScoutManager::onUnitDestroy(BWAPI::Unit * unit)
+void ScoutManager::onUnitDestroy(BWAPI::Unit unit)
 {
 	if (unit->getType() == BWAPI::UnitTypes::Zerg_Overlord && unit->getPlayer() == BWAPI::Broodwar->self())
 	{
@@ -214,13 +214,13 @@ void ScoutManager::overlordMove(Scout& overlord)
 		BWAPI::TilePosition nextMovePosition = BWAPI::TilePositions::None;
 		for (int i = 0; i < int(moveDirections.size()); i++)
 		{
-			BWAPI::TilePosition nextTilePosition(overlord.overLord->getTilePosition().x() + int(moveDirections[i].x * walkRate), overlord.overLord->getTilePosition().y() + int(moveDirections[i].y * walkRate));
-			if (nextTilePosition.x() > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x() < 0
-				|| nextTilePosition.y() > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y() < 0)
+			BWAPI::TilePosition nextTilePosition(overlord.overLord->getTilePosition().x + int(moveDirections[i].x * walkRate), overlord.overLord->getTilePosition().y + int(moveDirections[i].y * walkRate));
+			if (nextTilePosition.x > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x < 0
+				|| nextTilePosition.y > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y < 0)
 			{
 				continue;
 			}
-			int nextAirForce = int(influnceMap[nextTilePosition.x()][nextTilePosition.y()].airForce) + int(influnceMap[nextTilePosition.x()][nextTilePosition.y()].decayAirForce);
+			int nextAirForce = int(influnceMap[nextTilePosition.x][nextTilePosition.y].airForce) + int(influnceMap[nextTilePosition.x][nextTilePosition.y].decayAirForce);
 			if (nextAirForce < lowestAirForce || (nextAirForce == lowestAirForce && nextTilePosition.getDistance(overlord.TileTarget) < cloest))
 			{
 				nextMovePosition = nextTilePosition;
@@ -243,7 +243,7 @@ void ScoutManager::overlordMove(Scout& overlord)
 
 void ScoutManager::update()
 {
-	std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& enemyBuildings = InformationManager::Instance().getEnemyOccupiedDetail();
+	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& enemyBuildings = InformationManager::Instance().getEnemyOccupiedDetail();
 
 	switch (state)
 	{
@@ -259,7 +259,7 @@ void ScoutManager::update()
 				smartMove(it->overLord, BWAPI::Position(it->TileTarget));
 
 				bool depot = false;
-				BOOST_FOREACH(BWAPI::Unit* u, BWAPI::Broodwar->enemy()->getUnits())
+				BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->enemy()->getUnits())
 				{
 					if (u->getType().isBuilding() && ((BWTA::getRegion(u->getPosition()) == BWTA::getRegion(it->TileTarget)) 
 						|| (BWTA::getRegion(u->getPosition()) == BWTA::getRegion(it->naturalTileTarget))) )
@@ -359,7 +359,7 @@ void ScoutManager::generateScoutLocation()
 	BWTA::Region* nextBase = BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation());
 	double maxDist = 0;
 	BWAPI::Position maxChokeCenter;
-	BWTA::Chokepoint* maxChoke;
+	BWTA::Chokepoint* maxChoke = nullptr;
 	BOOST_FOREACH(BWTA::Chokepoint* p, nextBase->getChokepoints())
 	{
 		if (InformationManager::Instance().GetOurBaseUnit()->getDistance(p->getCenter()) > maxDist)
@@ -389,7 +389,7 @@ void ScoutManager::generateScoutLocation()
 }
 
 
-void ScoutManager::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const
+void ScoutManager::smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const
 {
 	assert(attacker);
 
@@ -415,7 +415,7 @@ void ScoutManager::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosit
 		if (attacker->isSelected())
 		{
 			return;
-			//BWAPI::Broodwar->printf("Previous Command Frame=%d Pos=(%d, %d)", attacker->getLastCommandFrame(), currentCommand.getTargetPosition().x(), currentCommand.getTargetPosition().y());
+			//BWAPI::Broodwar->printf("Previous Command Frame=%d Pos=(%d, %d)", attacker->getLastCommandFrame(), currentCommand.getTargetPosition().x, currentCommand.getTargetPosition().y);
 		}
 		return;
 	}
@@ -425,8 +425,8 @@ void ScoutManager::smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosit
 
 	if (Options::Debug::DRAW_UALBERTABOT_DEBUG)
 	{
-		BWAPI::Broodwar->drawLineMap(attacker->getPosition().x(), attacker->getPosition().y(),
-			targetPosition.x(), targetPosition.y(), BWAPI::Colors::Orange);
+		BWAPI::Broodwar->drawLineMap(attacker->getPosition().x, attacker->getPosition().y,
+			targetPosition.x, targetPosition.y, BWAPI::Colors::Orange);
 	}
 }
 

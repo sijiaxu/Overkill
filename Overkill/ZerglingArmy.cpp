@@ -2,7 +2,7 @@
 
 
 
-void ZerglingArmy::attackScoutWorker(BWAPI::Unit* unit)
+void ZerglingArmy::attackScoutWorker(BWAPI::Unit unit)
 {
 	int zerglingAttackRange = BWAPI::UnitTypes::Zerg_Zergling.groundWeapon().maxRange();
 
@@ -18,8 +18,8 @@ void ZerglingArmy::attackScoutWorker(BWAPI::Unit* unit)
 			double2 direc = unit->getPosition() - u.unit->getPosition();
 			double2 direcNormal = direc / direc.len();
 
-			int targetx = unit->getPosition().x() + int(direcNormal.x * 32 * 2);
-			int targety = unit->getPosition().y() + int(direcNormal.y * 32 * 2);
+			int targetx = unit->getPosition().x + int(direcNormal.x * 32 * 2);
+			int targety = unit->getPosition().y + int(direcNormal.y * 32 * 2);
 			BWAPI::Position target(targetx, targety);
 			smartMove(u.unit, target);
 		}
@@ -36,9 +36,9 @@ void ZerglingArmy::harassAttack(BWAPI::Position targetPosition)
 	std::set<BWTA::Region *> & ourRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 	if (BWAPI::Broodwar->getFrameCount() < 10000)
 	{
-		std::map<BWTA::Region*, std::set<BWAPI::Unit*>> enemyUnitsInRegion;
+		std::map<BWTA::Region*, std::set<BWAPI::Unit>> enemyUnitsInRegion;
 
-		BOOST_FOREACH(BWAPI::Unit * enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
+		BOOST_FOREACH(BWAPI::Unit enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
 		{
 			// if we do not have anti-air army, ignore
 			if (enemyUnit->getType().isFlyer())
@@ -60,21 +60,21 @@ void ZerglingArmy::harassAttack(BWAPI::Position targetPosition)
 	int zerglingSpeed = int(BWAPI::UnitTypes::Zerg_Zergling.topSpeed());
 
 	// only attack nearby enemy
-	//std::set<BWAPI::Unit*> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
+	//std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
 	
 	//enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
 
 	BOOST_FOREACH(UnitState u, units)
 	{
-		BWAPI::Unit* unit = u.unit;
+		BWAPI::Unit unit = u.unit;
 		int closetDist = 99999;
 		int highPriority = 0;
-		BWAPI::Unit* closet = NULL;
+		BWAPI::Unit closet = NULL;
 
-		std::set<BWAPI::Unit*> enemySet = u.unit->getUnitsInRadius(6 * 32);
+		BWAPI::Unitset enemySet = u.unit->getUnitsInRadius(6 * 32);
 
 		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy())
 			{
@@ -119,15 +119,15 @@ void ZerglingArmy::attack(BWAPI::Position targetPosition)
 
 	BOOST_FOREACH(UnitState u, units)
 	{
-		BWAPI::Unit* unit = u.unit;
-		std::set<BWAPI::Unit*> enemySet = u.unit->getUnitsInRadius(BWAPI::UnitTypes::Zerg_Zergling.groundWeapon().maxRange());
+		BWAPI::Unit unit = u.unit;
+		BWAPI::Unitset enemySet = u.unit->getUnitsInRadius(BWAPI::UnitTypes::Zerg_Zergling.groundWeapon().maxRange());
 
 		int closetDist = 99999;
 		int highPriority = 0;
-		BWAPI::Unit* closet = NULL;
+		BWAPI::Unit closet = NULL;
 
 		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy())
 			{
@@ -159,20 +159,20 @@ void ZerglingArmy::defend(BWAPI::Position targetPosition)
 	if (units.size() == 0)
 		return;
 
-	std::set<BWAPI::Unit*> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
+	std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
 
 	BOOST_FOREACH(UnitState u, units)
 	{
-		BWAPI::Unit* unit = u.unit;
-		std::set<BWAPI::Unit*> enemySet = unit->getUnitsInRadius(6 * 32);
+		BWAPI::Unit unit = u.unit;
+		std::set<BWAPI::Unit> enemySet = unit->getUnitsInRadius(6 * 32);
 		enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
 
 		int closetDist = 99999;
 		int highPriority = 0;
-		BWAPI::Unit* closet = NULL;
+		BWAPI::Unit closet = NULL;
 
 		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit* u, enemySet)
+		BOOST_FOREACH(BWAPI::Unit u, enemySet)
 		{
 			if (u->getPlayer() == BWAPI::Broodwar->enemy())
 			{
@@ -196,7 +196,7 @@ void ZerglingArmy::defend(BWAPI::Position targetPosition)
 }
 
 
-void ZerglingArmy::zerglingFSM(UnitState& myUnit, BWAPI::Unit* target)
+void ZerglingArmy::zerglingFSM(UnitState& myUnit, BWAPI::Unit target)
 {
 	switch (myUnit.state)
 	{
@@ -213,11 +213,11 @@ void ZerglingArmy::zerglingFSM(UnitState& myUnit, BWAPI::Unit* target)
 			double2 direc = myUnit.unit->getPosition() - target->getPosition();
 			double2 direcNormal = direc / direc.len();
 			 
-			int targetx = myUnit.unit->getPosition().x() + int(direcNormal.x * 32 * 5);
-			int targety = myUnit.unit->getPosition().y() + int(direcNormal.y * 32 * 5);
+			int targetx = myUnit.unit->getPosition().x + int(direcNormal.x * 32 * 5);
+			int targety = myUnit.unit->getPosition().y + int(direcNormal.y * 32 * 5);
 
 			myUnit.retreatPosition = BWAPI::Position(targetx < 0 ? 32 : (targetx > BWAPI::Broodwar->mapWidth() * 32 ? BWAPI::Broodwar->mapWidth() * 31 : targetx), targety < 0 ? 32 : (targety > BWAPI::Broodwar->mapHeight() * 32 ? BWAPI::Broodwar->mapHeight() * 31 : targety));
-			if (BWAPI::Broodwar->isWalkable(myUnit.retreatPosition.x() / 8, myUnit.retreatPosition.y() / 8))
+			if (BWAPI::Broodwar->isWalkable(myUnit.retreatPosition.x / 8, myUnit.retreatPosition.y / 8))
 				myUnit.state = LOWHEALTHRetreat;
 			else
 			{
@@ -246,7 +246,7 @@ void ZerglingArmy::zerglingFSM(UnitState& myUnit, BWAPI::Unit* target)
 }
 
 // get the attack priority of a type in relation to a zergling
-int ZerglingArmy::getAttackPriority(BWAPI::Unit * unit)
+int ZerglingArmy::getAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 
@@ -289,7 +289,7 @@ int ZerglingArmy::getAttackPriority(BWAPI::Unit * unit)
 	}
 }
 
-int ZerglingArmy::harassAttackPriority(BWAPI::Unit * unit)
+int ZerglingArmy::harassAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 

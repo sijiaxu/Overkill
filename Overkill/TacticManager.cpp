@@ -36,7 +36,7 @@ void TacticManager::addTactic(tacticType tactic, BWAPI::Position attackPosition)
 }
 
 
-void TacticManager::addTacticUnit(tacticType tactic, BWAPI::Position attackPosition, BWAPI::Unit * unit)
+void TacticManager::addTacticUnit(tacticType tactic, BWAPI::Position attackPosition, BWAPI::Unit unit)
 {
 	if (myTactic.find(tacKey(tactic, attackPosition)) == myTactic.end())
 		return;
@@ -114,7 +114,7 @@ BWAPI::Position TacticManager::getTacticPosition(tacticType tactic)
 	return BWAPI::Positions::None;
 }
 
-void TacticManager::onUnitDestroy(BWAPI::Unit * unit)
+void TacticManager::onUnitDestroy(BWAPI::Unit unit)
 {
 	typedef std::pair<tacKey, BattleTactic*> mytype;
 
@@ -145,7 +145,7 @@ void TacticManager::checkTacticEnd()
 	}
 }
 
-void TacticManager::onUnitShow(BWAPI::Unit* unit)
+void TacticManager::onUnitShow(BWAPI::Unit unit)
 {
 	typedef std::pair<tacKey, BattleTactic*> mytype;
 	BOOST_FOREACH(mytype tactic, myTactic)

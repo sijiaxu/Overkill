@@ -7,13 +7,13 @@
 
 
 struct Scout{
-	Scout(BWAPI::Unit* u)
+	Scout(BWAPI::Unit u)
 	{
 		overLord = u;
 		TileTarget = BWAPI::Broodwar->self()->getStartLocation();
 		nextMovePosition = BWAPI::TilePositions::None;
 	}
-	BWAPI::Unit* overLord;
+	BWAPI::Unit overLord;
 	BWAPI::TilePosition TileTarget;
 	BWAPI::TilePosition nextMovePosition;
 	BWAPI::TilePosition naturalTileTarget;
@@ -52,7 +52,7 @@ class ScoutManager {
 
 	std::vector<scoutTarget>   scoutLocation;
 
-	void						smartMove(BWAPI::Unit * attacker, BWAPI::Position targetPosition) const;
+	void						smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
 	void						assignScoutWork();
 	void						generateScoutLocation();
 	void						idleRally();
@@ -63,16 +63,16 @@ class ScoutManager {
 public:
 	void						update();
 
-	void						onUnitDestroy(BWAPI::Unit * unit);
-	void						onUnitMorph(BWAPI::Unit * unit);
-	void						onUnitShow(BWAPI::Unit* unit);
+	void						onUnitDestroy(BWAPI::Unit unit);
+	void						onUnitMorph(BWAPI::Unit unit);
+	void						onUnitShow(BWAPI::Unit unit);
 	static ScoutManager&		Instance();
 
 	void						addScoutLocation(BWAPI::TilePosition location);
-	void						addScoutUnit(BWAPI::Unit* unit);
+	void						addScoutUnit(BWAPI::Unit unit);
 
 	int							getIdleOverlordNum() { return int(overLordIdle.size()); }
-	std::vector<BWAPI::Unit*>	getOverLordArmy(int count);
+	std::vector<BWAPI::Unit>	getOverLordArmy(int count);
 	void						giveBackOverLordArmy(BattleArmy* army);
 
 

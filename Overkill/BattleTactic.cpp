@@ -25,9 +25,9 @@ bool BattleTactic::hasEnemy()
 		return true;
 
 	// if current attack position has target, do not change original attack position
-	std::set<BWAPI::Unit*>& units = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 8 * 32);
+	BWAPI::Unitset& units = BWAPI::Broodwar->getUnitsInRadius(attackPosition, 8 * 32);
 	bool needAttack = false;
-	BOOST_FOREACH(BWAPI::Unit* u, units)
+	BOOST_FOREACH(BWAPI::Unit u, units)
 	{
 		if (u->getPlayer() == BWAPI::Broodwar->enemy() && BWTA::getRegion(u->getPosition()) == BWTA::getRegion(attackPosition) && u->getType() != BWAPI::UnitTypes::Protoss_Observer)
 		{
@@ -42,12 +42,12 @@ bool BattleTactic::hasEnemy()
 	// no enemy in attackPosition circle, looking for remaining building in the region
 	if (needAttack == false)
 	{
-		std::map<BWTA::Region*, std::map<BWAPI::Unit*, buildingInfo>>& occupiedDetail = InformationManager::Instance().getEnemyOccupiedDetail();
+		std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>>& occupiedDetail = InformationManager::Instance().getEnemyOccupiedDetail();
 		if (occupiedDetail.find(BWTA::getRegion(attackPosition)) != occupiedDetail.end())
 		{
-			std::map<BWAPI::Unit*, buildingInfo >& tmp = occupiedDetail[BWTA::getRegion(attackPosition)];
+			std::map<BWAPI::Unit, buildingInfo >& tmp = occupiedDetail[BWTA::getRegion(attackPosition)];
 
-			for (std::map<BWAPI::Unit*, buildingInfo >::iterator it = tmp.begin(); it != tmp.end(); it++)
+			for (std::map<BWAPI::Unit, buildingInfo >::iterator it = tmp.begin(); it != tmp.end(); it++)
 			{
 				if ((!it->second.unitType.isRefinery() && tmp.size() > 1) ||
 					(tmp.size() == 1))
@@ -64,7 +64,7 @@ bool BattleTactic::hasEnemy()
 
 
 
-bool BattleTactic::unitNearChokepoint(BWAPI::Unit * unit) const
+bool BattleTactic::unitNearChokepoint(BWAPI::Unit unit) const
 {
 	BOOST_FOREACH(BWTA::Chokepoint * choke, BWTA::getChokepoints())
 	{
@@ -79,7 +79,7 @@ bool BattleTactic::unitNearChokepoint(BWAPI::Unit * unit) const
 
 void BattleTactic::newArmyRally()
 {
-	for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end();)
+	for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end();)
 	{
 		if (state != RETREAT)
 		{
@@ -126,7 +126,7 @@ BattleTactic::~BattleTactic()
 
 void BattleTactic::addAllNewArmy()
 {
-	for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end();)
+	for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end();)
 	{
 		it->first->stop();
 		tacticArmy[it->first->getType()]->addUnit(it->first);
@@ -134,7 +134,7 @@ void BattleTactic::addAllNewArmy()
 	}
 }
 
-void BattleTactic::onUnitDestroy(BWAPI::Unit * unit)
+void BattleTactic::onUnitDestroy(BWAPI::Unit unit)
 {
 	if (unit == NULL || tacticArmy.find(unit->getType()) == tacticArmy.end())
 		return;
@@ -149,7 +149,7 @@ void BattleTactic::onUnitDestroy(BWAPI::Unit * unit)
 		}
 	}
 
-	for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+	for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 	{
 		if (it->first == unit)
 		{

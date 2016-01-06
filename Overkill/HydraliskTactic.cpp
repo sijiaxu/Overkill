@@ -5,15 +5,15 @@
 bool HydraliskTactic::needRetreat()
 {
 	int ourArmySupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size());
-	BOOST_FOREACH(BWAPI::Unit* u, friendUnitNearBy)
+	BOOST_FOREACH(BWAPI::Unit u, friendUnitNearBy)
 	{
 		ourArmySupply += u->getType().supplyRequired();
 	}
 
-	BWAPI::Unit* firstHydra = (*tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().begin()).unit;
+	BWAPI::Unit firstHydra = (*tacticArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().begin()).unit;
 
 	std::vector<std::vector<gridInfo>>& enemyIm = InformationManager::Instance().getEnemyInfluenceMap();
-	double2 centerPoint(firstHydra->getTilePosition().x(), firstHydra->getTilePosition().y());
+	double2 centerPoint(firstHydra->getTilePosition().x, firstHydra->getTilePosition().y);
 	int maxIM = 0;
 	for (int x = int(centerPoint.x - 8 < 0 ? 0 : centerPoint.x - 8); x <= int(centerPoint.x + 8 > BWAPI::Broodwar->mapWidth() - 1 ? BWAPI::Broodwar->mapWidth() - 1 : centerPoint.x + 8); x++)
 	{
@@ -32,7 +32,7 @@ bool HydraliskTactic::needRetreat()
 	}
 
 	int enemySupply = 0;
-	BOOST_FOREACH(BWAPI::Unit* u, nearbyUnits)
+	BOOST_FOREACH(BWAPI::Unit u, nearbyUnits)
 	{
 		if (u->getType().isBuilding() && u->isCompleted() && (u->getType().groundWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker))
 		{
@@ -69,7 +69,7 @@ void HydraliskTactic::update()
 		return;
 	}
 
-	BWAPI::Unit* firstHydra = hydralisks->getUnits().front().unit;
+	BWAPI::Unit firstHydra = hydralisks->getUnits().front().unit;
 
 	if ((*BWTA::getRegion(attackPosition)->getBaseLocations().begin())->isIsland())
 	{
@@ -81,7 +81,7 @@ void HydraliskTactic::update()
 	{
 		newAddMovePositions.clear();
 		newAddMovePositions.push_back((*hydralisks->getUnits().begin()).unit->getPosition());
-		for (std::map<BWAPI::Unit*, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
+		for (std::map<BWAPI::Unit, std::vector<BWAPI::Position>>::iterator it = newAddArmy.begin(); it != newAddArmy.end(); it++)
 		{
 			it->second = newAddMovePositions;
 		}
@@ -110,9 +110,9 @@ void HydraliskTactic::update()
 	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 	nearbyUnits.clear();
 	friendUnitNearBy.clear();
-	std::set<BWAPI::Unit*> tmp = firstHydra->getUnitsInRadius(12 * 32);
+	BWAPI::Unitset tmp = firstHydra->getUnitsInRadius(12 * 32);
 	// if enemy can attack us, add in nearby enemies count
-	BOOST_FOREACH(BWAPI::Unit* unit, tmp)
+	BOOST_FOREACH(BWAPI::Unit unit, tmp)
 	{
 		if (unit->getPlayer() == BWAPI::Broodwar->enemy())
 		{
@@ -132,11 +132,11 @@ void HydraliskTactic::update()
 		moveBackBase = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
 	else
 		moveBackBase = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
-	std::set<BWAPI::Unit*> unitsInCircle;
+	BWAPI::Unitset unitsInCircle;
 	unitsInCircle = BWAPI::Broodwar->getUnitsInRadius(moveBackBase, 12 * 32);
 
-	std::set<BWAPI::Unit*> enemyInCircle;
-	BOOST_FOREACH(BWAPI::Unit* enemy, unitsInCircle)
+	std::set<BWAPI::Unit> enemyInCircle;
+	BOOST_FOREACH(BWAPI::Unit enemy, unitsInCircle)
 	{
 		if (enemy->getPlayer() == BWAPI::Broodwar->enemy())
 		{

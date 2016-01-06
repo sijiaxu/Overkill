@@ -11,7 +11,7 @@ void OverLordArmy::defend(BWAPI::Position targetPosition)
 }
 
 
-void OverLordArmy::follow(BWAPI::Unit* target)
+void OverLordArmy::follow(BWAPI::Unit target)
 {
 	BOOST_FOREACH(UnitState u, units)
 	{

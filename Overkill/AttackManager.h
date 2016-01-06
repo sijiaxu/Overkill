@@ -57,10 +57,10 @@ class AttackManager{
 	bool					hasWorkerScouter;
 
 	bool					zerglingHarassFlag;
-	std::vector<BWAPI::Unit*> unRallyArmy;
+	std::vector<BWAPI::Unit> unRallyArmy;
 	BWAPI::Position			rallyPosition;
 
-	std::set<BWAPI::Unit *> enemyInvadeSet;
+	std::set<BWAPI::Unit> enemyInvadeSet;
 	void					groupArmy();
 	bool					isArmyHealthy(BWAPI::UnitType unitType);
 
@@ -68,7 +68,7 @@ class AttackManager{
 	DefendState				defendState;
 	int						recoverLostTime;
 
-	void					DefendEnemy(std::set<BWAPI::Unit *>& enemyUnitsInRegion, int enemyTotalSupply);
+	void					DefendEnemy(std::set<BWAPI::Unit>& enemyUnitsInRegion, int enemyTotalSupply);
 	void					DefendOver();
 	void					DefendUpdate();
 	void					DefendProductionStrategy(int myTotalArmySupply, int enemyTotalSupply);
@@ -85,9 +85,9 @@ class AttackManager{
 public:
 	
 	void					update();
-	void					onUnitMorph(BWAPI::Unit* unit);
-	void					onUnitDestroy(BWAPI::Unit * unit);
-	void					onEnemyUnitDestroy(BWAPI::Unit* unit);
+	void					onUnitMorph(BWAPI::Unit unit);
+	void					onUnitDestroy(BWAPI::Unit unit);
+	void					onEnemyUnitDestroy(BWAPI::Unit unit);
 
 	void					addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy, tacticType tacType, BWAPI::Position attackTarget, bool endByDefend);
 	bool					isNeedRetreatDefend() { return isNeedTacticDefend; }
