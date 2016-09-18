@@ -3,7 +3,7 @@
 #include "Common.h"
 #include "BuildingManager.h"
 #include "WorkerData.h"
-#include "ScoutManager.h"
+#include "TacticManager.h"
 #include "InformationManager.h"
 #include "StrategyManager.h"
 

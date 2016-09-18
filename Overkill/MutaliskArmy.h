@@ -1,6 +1,6 @@
 #pragma once
 #include "BattleArmy.h"
-#include "InformationManager.h"
+
 
 
 

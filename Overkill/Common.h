@@ -38,11 +38,20 @@ typedef		unsigned int		HashType;
 typedef     int                 UCTValue;
 
 
+
 typedef std::vector<BWAPI::Unit> UnitVector;
 
 BWAPI::AIModule * __NewAIModule();
 
-enum tacticType { ZerglingHarassTac = 0, MutaliskHarassTac = 1, HydraliskPushTactic = 2, DefendTactic = 3, tactictypeEnd};
+
+enum tacticType { HydraliskPushTactic, MutaliskHarassTac, DefendTactic, ScoutTac, tactictypeEnd };// ZerglingHarassTac = 1
+enum openingStrategy { TwelveHatchMuta, NinePoolling, TenHatchMuta };
+
+
+enum developMode { Develop, Release };
+extern developMode	curMode;
+
+
 
 struct double2
 {
@@ -78,5 +87,4 @@ struct double2
 		return double2(x * cos(angle) - y * sin(angle), y * cos(angle) + x * sin(angle));
 	}
 };
-
 

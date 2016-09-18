@@ -1,7 +1,7 @@
 #pragma once
 #include "Common.h"
 
-enum microState { Attack = 0, LOWHEALTHRetreat = 1, Kite = 2, InCannonRange = 3, MoveToSafePlace = 4};
+enum microState { Attack = 0, LOWHEALTHRetreat = 1, Kite = 2, InCannonRange = 3, MoveToSafePlace = 4, Irradiated = 5};
 
 struct UnitState
 {

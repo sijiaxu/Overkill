@@ -8,12 +8,22 @@ struct EnemyUnit
 	BWAPI::Unit unit;
 	int priority;
 	int distance;
+	int assignCount;
+
+	EnemyUnit()
+	{
+		unit = NULL;
+		priority = 0;
+		distance = 0;
+		assignCount = 0;
+	}
 
 	EnemyUnit(BWAPI::Unit u, int p, int d)
 	{
 		unit = u;
 		priority = p;
 		distance = d;
+		assignCount = 0;
 	}
 
 	bool operator < (const EnemyUnit& u) const
@@ -60,14 +70,17 @@ class BattleArmy
 {
 protected:
 	std::vector<UnitState>	units;
-	void						smartAttackUnit(BWAPI::Unit attacker, BWAPI::Unit target) const;
-	void						smartAttackMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
-	void						smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
+
+	int							calMaxAssign(BWAPI::Unit enemyUnit, BWAPI::UnitType ourType);
+
+	void						moveAbnormalUnits();
 
 public:
 	BattleArmy() { units.reserve(100); }
 	virtual void				defend(BWAPI::Position targetPosition) = 0;
 	virtual void				attack(BWAPI::Position priorityPosition) = 0;
+	virtual void				mixAttack(BWAPI::Position priorityPosition, std::set<BWAPI::Unit> enemySet) {};
+	void						assignTarget(std::vector<EnemyUnit>& priorityEnemy, BWAPI::UnitType armyType, BWAPI::Position targetPosition);
 
 	void						addUnit(BWAPI::Unit u);
 	std::vector<UnitState>&		getUnits() { return units; }
@@ -77,6 +90,12 @@ public:
 
 	bool						preciseReGroup(const BWAPI::Position & regroupPosition);
 	bool						isInDanger(BWAPI::Unit u);
+
+	void						removeUnit(BWAPI::Unit u);
+
+	static void					smartAttackUnit(BWAPI::Unit attacker, BWAPI::Unit target);
+	static void					smartAttackMove(BWAPI::Unit attacker, BWAPI::Position targetPosition);
+	static void					smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition);
 
 };
 

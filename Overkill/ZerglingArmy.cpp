@@ -1,5 +1,5 @@
 #include "ZerglingArmy.h"
-
+#include "InformationManager.h"
 
 
 void ZerglingArmy::attackScoutWorker(BWAPI::Unit unit)
@@ -9,7 +9,7 @@ void ZerglingArmy::attackScoutWorker(BWAPI::Unit unit)
 	BOOST_FOREACH(UnitState u, units)
 	{
 		int distance = u.unit->getDistance(unit);
-		if (distance < zerglingAttackRange)
+		if (distance <= zerglingAttackRange)
 		{
 			smartAttackUnit(u.unit, unit);
 		}
@@ -24,6 +24,91 @@ void ZerglingArmy::attackScoutWorker(BWAPI::Unit unit)
 			smartMove(u.unit, target);
 		}
 	}
+}
+
+
+void ZerglingArmy::mixAttack(BWAPI::Position targetPosition, std::set<BWAPI::Unit> enemySet)
+{
+	if (units.size() == 0)
+		return;
+
+	bool isWorkerScout = false;
+	std::set<BWTA::Region *> & ourRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	if (BWAPI::Broodwar->getFrameCount() < 10000)
+	{
+		std::map<BWTA::Region*, std::set<BWAPI::Unit>> enemyUnitsInRegion;
+
+		BOOST_FOREACH(BWAPI::Unit enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
+		{
+			// if we do not have anti-air army, ignore
+			if (enemyUnit->getType().isFlyer())
+				continue;
+
+			if (ourRegions.find(BWTA::getRegion(enemyUnit->getPosition())) != ourRegions.end())
+			{
+				enemyUnitsInRegion[BWTA::getRegion(enemyUnit->getPosition())].insert(enemyUnit);
+			}
+		}
+
+		if (enemyUnitsInRegion.size() == 1 && enemyUnitsInRegion.begin()->second.size() == 1 &&
+			(*enemyUnitsInRegion.begin()->second.begin())->getType().isWorker())
+		{
+			isWorkerScout = true;
+		}
+	}
+
+	int minTargetDistance = 99999;
+	BWAPI::Unit firstZergling = NULL;
+	for (auto u : units)
+	{
+		if (u.unit->getDistance(targetPosition) < minTargetDistance)
+		{
+			minTargetDistance = u.unit->getDistance(targetPosition);
+			firstZergling = u.unit;
+		}
+	}
+
+	int zerglingSpeed = int(BWAPI::UnitTypes::Zerg_Zergling.topSpeed());
+	std::vector<EnemyUnit> priorityEnemy;
+
+
+	BWAPI::Broodwar->drawCircleMap(firstZergling->getPosition().x, firstZergling->getPosition().y, 8 * 32, BWAPI::Colors::Green, false);
+
+	for (auto u : enemySet)
+	{
+		if (u->getPlayer() == BWAPI::Broodwar->enemy())
+		{
+			if (u->getType().isFlyer() || (!u->isDetected() && u->isVisible()))
+				continue;
+
+			//if (int(u->getType().topSpeed()) >= zerglingSpeed && !u->isAttacking() && BWTA::getRegion(u->getPosition()) != BWTA::getRegion(targetPosition))
+				//continue;
+
+			//do not attack scout worker
+			if (isWorkerScout && u->getType().isWorker() && ourRegions.find(BWTA::getRegion(u->getPosition())) != ourRegions.end())
+			{
+				continue;
+			}
+
+			if (u->getType().groundWeapon() != BWAPI::WeaponTypes::None)
+			{
+				int enemyAttackRange = u->getType().groundWeapon().maxRange() + 1 * 32;
+				BWAPI::Unitset percentUnits = u->getUnitsInRadius(enemyAttackRange, BWAPI::Filter::IsAlly);
+				if (percentUnits.size() > 0)
+				{
+					priorityEnemy.push_back(EnemyUnit(u, getAttackPriority(u), firstZergling->getDistance(u)));
+				}
+			}
+			else
+			{
+				priorityEnemy.push_back(EnemyUnit(u, getAttackPriority(u), firstZergling->getDistance(u)));
+			}
+
+			//priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), firstZergling->getDistance(u)));
+		}
+	}
+
+	assignTarget(priorityEnemy, BWAPI::UnitTypes::Zerg_Zergling, targetPosition);
 }
 
 
@@ -57,142 +142,116 @@ void ZerglingArmy::harassAttack(BWAPI::Position targetPosition)
 		}
 	}
 	
-	int zerglingSpeed = int(BWAPI::UnitTypes::Zerg_Zergling.topSpeed());
-
-	// only attack nearby enemy
-	//std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
-	
-	//enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
-
-	BOOST_FOREACH(UnitState u, units)
+	int minTargetDistance = 99999;
+	BWAPI::Unit firstZergling = NULL;
+	for (auto u : units)
 	{
-		BWAPI::Unit unit = u.unit;
-		int closetDist = 99999;
-		int highPriority = 0;
-		BWAPI::Unit closet = NULL;
-
-		BWAPI::Unitset enemySet = u.unit->getUnitsInRadius(6 * 32);
-
-		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit u, enemySet)
+		if (u.unit->getDistance(targetPosition) < minTargetDistance)
 		{
-			if (u->getPlayer() == BWAPI::Broodwar->enemy())
-			{
-				if (u->getType().isFlyer())
-					continue;
-				
-				if (int(u->getType().topSpeed()) >= zerglingSpeed && !u->isAttacking() && BWTA::getRegion(u->getPosition()) != BWTA::getRegion(targetPosition))
-					continue;
-
-				//do not attack scout worker
-				if (isWorkerScout && u->getType().isWorker() && ourRegions.find(BWTA::getRegion(u->getPosition())) != ourRegions.end())
-				{
-					continue;
-				}
-
-				//ignore cannon, kill worker first
-				int priority = harassAttackPriority(u);
-				int distance = unit->getDistance(u);
-
-				// if it's a higher priority, or it's closer, set it
-				if (!closet || (priority > highPriority) || (priority == highPriority && distance < closetDist))
-				{
-					closetDist = distance;
-					highPriority = priority;
-					closet = u;
-				}
-			}
+			minTargetDistance = u.unit->getDistance(targetPosition);
+			firstZergling = u.unit;
 		}
-
-		// do not attack building alone the way
-		if (closet != NULL)
-			smartAttackUnit(u.unit, closet);
-		else
-			smartMove(unit, targetPosition);
 	}
+
+	int zerglingSpeed = int(BWAPI::UnitTypes::Zerg_Zergling.topSpeed());
+	std::vector<EnemyUnit> priorityEnemy;
+
+	BWAPI::Unitset enemySet = firstZergling->getUnitsInRadius(4 * 32);
+	for (int percent = 0; percent < 5; percent++)
+	{
+		BWAPI::Unitset percentUnits = units[int(units.size() * percent * 0.2)].unit->getUnitsInRadius(12 * 32);
+		enemySet.insert(percentUnits.begin(), percentUnits.end());
+	}
+
+
+	BWAPI::Broodwar->drawCircleMap(firstZergling->getPosition().x, firstZergling->getPosition().y, 8 * 32, BWAPI::Colors::Green, false);
+
+	for (auto u : enemySet)
+	{
+		if (u->getPlayer() == BWAPI::Broodwar->enemy())
+		{
+			if (u->getType().isFlyer() || (!u->isDetected() && u->isVisible()))
+				continue;
+
+			//if (int(u->getType().topSpeed()) >= zerglingSpeed && !u->isAttacking() && BWTA::getRegion(u->getPosition()) != BWTA::getRegion(targetPosition))
+				//continue;
+
+			//do not attack scout worker
+			if (isWorkerScout && u->getType().isWorker() && ourRegions.find(BWTA::getRegion(u->getPosition())) != ourRegions.end())
+			{
+				continue;
+			}
+			priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), firstZergling->getDistance(u)));
+		}
+	}
+
+	assignTarget(priorityEnemy, BWAPI::UnitTypes::Zerg_Zergling, targetPosition);
+
 }
 
 void ZerglingArmy::attack(BWAPI::Position targetPosition)
 {
-	if (units.size() == 0)
-		return;
-
-	BOOST_FOREACH(UnitState u, units)
-	{
-		BWAPI::Unit unit = u.unit;
-		BWAPI::Unitset enemySet = u.unit->getUnitsInRadius(BWAPI::UnitTypes::Zerg_Zergling.groundWeapon().maxRange());
-
-		int closetDist = 99999;
-		int highPriority = 0;
-		BWAPI::Unit closet = NULL;
-
-		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit u, enemySet)
-		{
-			if (u->getPlayer() == BWAPI::Broodwar->enemy())
-			{
-				int priority = getAttackPriority(u);
-				int distance = unit->getDistance(u);
-
-				// if it's a higher priority, or it's closer, set it
-				if (!closet || (priority > highPriority) || (priority == highPriority && distance < closetDist))
-				{
-					closetDist = distance;
-					highPriority = priority;
-					closet = u;
-				}
-			}
-		}
-		if (closet != NULL )
-			smartAttackUnit(u.unit, closet);
-		else
-			smartMove(unit, targetPosition);
-	}
+	harassAttack(targetPosition);
 }
 
 
 void ZerglingArmy::defend(BWAPI::Position targetPosition)
 {
-	harassAttack(targetPosition);
-
-	/*
 	if (units.size() == 0)
 		return;
 
-	std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 8 * 32);
+	bool isWorkerScout = false;
+	std::set<BWTA::Region *> & ourRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 
-	BOOST_FOREACH(UnitState u, units)
+	int minTargetDistance = 99999;
+	BWAPI::Unit firstZergling = units.front().unit;
+	for (auto u : units)
 	{
-		BWAPI::Unit unit = u.unit;
-		std::set<BWAPI::Unit> enemySet = unit->getUnitsInRadius(6 * 32);
-		enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
-
-		int closetDist = 99999;
-		int highPriority = 0;
-		BWAPI::Unit closet = NULL;
-
-		//get the target unit nearby and in target circle
-		BOOST_FOREACH(BWAPI::Unit u, enemySet)
+		if (u.unit->getDistance(targetPosition) < minTargetDistance)
 		{
-			if (u->getPlayer() == BWAPI::Broodwar->enemy())
-			{
-				int priority = getAttackPriority(u);
-				int distance = unit->getDistance(u);
-
-				// if it's a higher priority, or it's closer, set it
-				if (!closet || (priority > highPriority) || (priority == highPriority && distance < closetDist))
-				{
-					closetDist = distance;
-					highPriority = priority;
-					closet = u;
-				}
-			}
+			minTargetDistance = u.unit->getDistance(targetPosition);
+			firstZergling = u.unit;
 		}
-		if (closet != NULL)
-			smartAttackUnit(u.unit, closet);
-		else
-			smartMove(unit, targetPosition);
-	}*/
+	}
+
+	int zerglingSpeed = int(BWAPI::UnitTypes::Zerg_Zergling.topSpeed());
+	std::vector<EnemyUnit> priorityEnemy;
+
+	BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(targetPosition, 16 * 32, BWAPI::Filter::IsEnemy);
+	int count = 0;
+	for (auto u : units)
+	{
+		count += 1;
+		if (count % 2 == 0)
+		{
+			BWAPI::Unitset percentUnits = u.unit->getUnitsInRadius(6 * 32, BWAPI::Filter::IsEnemy);
+			enemySet.insert(percentUnits.begin(), percentUnits.end());
+		}
+	}
+
+	BWAPI::Broodwar->drawCircleMap(firstZergling->getPosition().x, firstZergling->getPosition().y, 8 * 32, BWAPI::Colors::Green, false);
+
+	for (auto u : enemySet)
+	{
+		if (u->getPlayer() == BWAPI::Broodwar->enemy())
+		{
+			if (u->getType().isFlyer() || (!u->isDetected() && u->isVisible()))
+				continue;
+
+			if (int(u->getType().topSpeed()) >= zerglingSpeed && !u->isAttacking() && BWTA::getRegion(u->getPosition()) != BWTA::getRegion(targetPosition))
+				continue;
+
+			//do not attack scout worker
+			if (isWorkerScout && u->getType().isWorker() && ourRegions.find(BWTA::getRegion(u->getPosition())) != ourRegions.end())
+			{
+				continue;
+			}
+			priorityEnemy.push_back(EnemyUnit(u, harassAttackPriority(u), firstZergling->getDistance(u)));
+		}
+	}
+
+	assignTarget(priorityEnemy, BWAPI::UnitTypes::Zerg_Zergling, targetPosition);
+
 }
 
 
@@ -250,10 +309,19 @@ int ZerglingArmy::getAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 
+	if (type == BWAPI::UnitTypes::Zerg_Egg || type == BWAPI::UnitTypes::Zerg_Larva)
+	{
+		return 0;
+	}
+
 	// highest priority is something that can attack us or aid in combat
 	if (type.groundWeapon() != BWAPI::WeaponTypes::None || type == BWAPI::UnitTypes::Terran_Bunker)
 	{
 		return 11;
+	}
+	else if (type.isSpellcaster())
+	{
+		return 10;
 	}
 	else if (type.isRefinery())
 	{
@@ -293,15 +361,26 @@ int ZerglingArmy::harassAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
 
-	// highest priority is something that can attack us or aid in combat
+	if (type == BWAPI::UnitTypes::Zerg_Egg || type == BWAPI::UnitTypes::Zerg_Larva)
+	{
+		return 0;
+	}
 
-	if (type.groundWeapon() != BWAPI::WeaponTypes::None || type == BWAPI::UnitTypes::Terran_Bunker)
+	// highest priority is something that can attack us or aid in combat
+	if ((type.groundWeapon() != BWAPI::WeaponTypes::None && !type.isWorker())
+		|| unit->isRepairing()
+		|| type == BWAPI::UnitTypes::Terran_Bunker
+		|| type == BWAPI::UnitTypes::Protoss_High_Templar)
 	{
 		return 11;
 	}
-	else if (type.isRefinery())
+	else if (type.isWorker())
 	{
 		return 8;
+	}
+	else if (type.isRefinery())
+	{
+		return 7;
 	}
 
 	else if (type.isResourceDepot())

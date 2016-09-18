@@ -1,5 +1,7 @@
 #pragma once
 #include "sixZerglingTactic.h"
+#include "InformationManager.h"
+#include "AttackManager.h"
 
 
 
@@ -12,22 +14,26 @@ void sixZerglingTactic::update()
 		return;
 	}
 
+	/*
 	if ((*BWTA::getRegion(attackPosition)->getBaseLocations().begin())->isIsland())
 	{
 		state = END;
 		return;
-	}
+	}*/
 
 	TimerManager::Instance().startTimer(TimerManager::ZerglingTac);
 
-	std::vector<unitDistance> armyDistance;
-	BOOST_FOREACH(UnitState u, zerglings->getUnits())
+	int minTargetDistance = 99999;
+	BWAPI::Unit firstZergling = NULL;
+	for (auto u : zerglings->getUnits())
 	{
-		armyDistance.push_back(unitDistance(u.unit, u.unit->getDistance(attackPosition)));
+		if (u.unit->getDistance(attackPosition) < minTargetDistance)
+		{
+			minTargetDistance = u.unit->getDistance(attackPosition);
+			firstZergling = u.unit;
+		}
 	}
-	std::sort(armyDistance.begin(), armyDistance.end());
-	BWAPI::Unit firstZergling = armyDistance.front().unit;
-	BWAPI::Broodwar->drawCircleMap(armyDistance.front().unit->getPosition().x, armyDistance.back().unit->getPosition().y, 8, BWAPI::Colors::Black, true);
+
 
 	if (BWAPI::Broodwar->getFrameCount() % 25 * 5 == 0)
 	{
@@ -38,6 +44,7 @@ void sixZerglingTactic::update()
 			it->second = newAddMovePositions;
 		}
 	}
+
 
 	newArmyRally();
 
@@ -64,13 +71,6 @@ void sixZerglingTactic::update()
 		{
 			friendUnitNearBy.insert(unit);
 		}
-
-			/*
-			if (unit->getPlayer() == BWAPI::Broodwar->self() && unit->getType() == BWAPI::UnitTypes::Zerg_Sunken_Colony
-			&& u.unit->getDistance(unit) <= BWAPI::UnitTypes::Zerg_Sunken_Colony.groundWeapon().maxRange())
-			{
-			nearbySunkens.insert(unit);
-			}*/
 	}
 	//}
 
@@ -138,10 +138,44 @@ void sixZerglingTactic::update()
 		}
 	}
 
+	bool isUnderAttack = false;
+	BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits())
+	{
+		if (u.unit->isUnderAttack())
+		{
+			isUnderAttack = true;
+			break;
+		}
+	}
+
 	switch (state)
 	{
+	case GROUPARMY:
+	{
+		BWAPI::Broodwar->drawCircleMap(groupPosition.x, groupPosition.y, 16, BWAPI::Colors::Red, true);
+
+		groupStatus = checkGroupStatus(groupPosition);
+
+		if (isUnderAttack || nearbyUnits.size() > 0 || groupStatus == true || groupPosition == attackPosition)
+		{
+			state = ATTACK;
+			nextGroupTime = BWAPI::Broodwar->getFrameCount() + 5 * 25;
+			break;
+		}
+		
+		zerglings->armyMove(groupPosition);
+	}
+	break;
+
 	case ATTACK:
 	{
+		//if don't have enemy nearby and attack position is occupied by enemy, and we have not grouped army, change to group status
+		if (nearbyUnits.size() == 0 && !isUnderAttack && groupStatus == false && groupPosition != attackPosition && BWAPI::Broodwar->getFrameCount() > nextGroupTime)
+		{
+			state = GROUPARMY;
+			break;
+		}
+
 		if (!hasEnemy())
 		{
 			state = END;
@@ -165,16 +199,11 @@ void sixZerglingTactic::update()
 				}
 			}
 
-			retreatTime = BWAPI::Broodwar->getFrameCount() + 2 * 25;
-			if (myRegions.size() > 1)
-				nextRetreatPosition = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
-			else
-				nextRetreatPosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+			retreatTime = BWAPI::Broodwar->getFrameCount() + 3 * 25;
+			bool needGroup = false;
+			BWAPI::Position tmpRetreat = groupArmyCheck(needGroup);
 
-			/*
-			std::list<BWAPI::TilePosition> findPath = aStarPathFinding(firstZergling->getTilePosition(), InformationManager::Instance().getOurNatrualLocation(), false, true);
-			// a star fail
-			if (findPath.size() == 1)
+			if (needGroup = false || firstZergling->getDistance(tmpRetreat) < 32 * 12)
 			{
 				if (myRegions.size() > 1)
 					nextRetreatPosition = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
@@ -183,15 +212,8 @@ void sixZerglingTactic::update()
 			}
 			else
 			{
-				std::list<BWAPI::TilePosition>::iterator it = findPath.begin();
-				if (findPath.size() >= 10)
-				{
-					std::advance(it, 9);
-					nextRetreatPosition = BWAPI::Position(*it);
-				}
-				else
-					nextRetreatPosition = BWAPI::Position(findPath.back());
-			}*/
+				nextRetreatPosition = tmpRetreat;
+			}
 
 			break;
 		}
@@ -202,28 +224,19 @@ void sixZerglingTactic::update()
 
 	case RETREAT:
 	{
-		BWAPI::Broodwar->drawCircleMap(nextRetreatPosition.x, nextRetreatPosition.y, 8, BWAPI::Colors::Red, true);
+		//BWAPI::Broodwar->drawCircleMap(nextRetreatPosition.x, nextRetreatPosition.y, 8, BWAPI::Colors::Red, true);
 		
-		bool isUnderAttack = false;
-		BOOST_FOREACH(UnitState u, tacticArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits())
-		{
-			if (u.unit->isUnderAttack())
-			{
-				isUnderAttack = true;
-				break;
-			}
-		}
 		// if no enemy nearby, wait to attack again
 		if (nearbyUnits.size() == 0 && !isUnderAttack)
 		{
 			state = WAIT;
-			nextAttackTime = BWAPI::Broodwar->getFrameCount() + 10 * 25;
+			nextAttackTime = BWAPI::Broodwar->getFrameCount() + 5 * 25;
 		}
 
 		zerglings->armyMove(nextRetreatPosition);
 
 		//if we reach the retreat position and still under attack, change to attack mode to choose the next action
-		if (BWAPI::Broodwar->getFrameCount() >= retreatTime && (isUnderAttack || nearbyUnits.size() > 0))
+		if ((BWAPI::Broodwar->getFrameCount() >= retreatTime) && (isUnderAttack || nearbyUnits.size() > 0))
 		{
 			state = ATTACK;
 			break;
@@ -290,8 +303,7 @@ bool sixZerglingTactic::isTacticEnd()
 
 sixZerglingTactic::sixZerglingTactic()
 {
-	state = ATTACK;
-
+	state = GROUPARMY;
 	retreatCount = 0;
 }
 
@@ -319,8 +331,8 @@ bool sixZerglingTactic::needRetreat()
 			}
 		}
 	}
-	// approximate 10 zerglings can take down one cannon
-	if (ourArmySupply <= maxIM / 4)
+	// approximate 4 zerglings can take down one cannon
+	if (ourArmySupply <= maxIM / 5)
 	{
 		return true;
 	}
@@ -328,10 +340,15 @@ bool sixZerglingTactic::needRetreat()
 	int enemySupply = 0;
 	BOOST_FOREACH(BWAPI::Unit u, nearbyUnits)
 	{
+		if (u->getType().isFlyer())
+		{
+			continue;
+		}
+
 		if (u->getType().isBuilding() && u->isCompleted() && (u->getType().groundWeapon() != BWAPI::WeaponTypes::None || u->getType() == BWAPI::UnitTypes::Terran_Bunker))
 		{
 			if (u->getType() == BWAPI::UnitTypes::Terran_Bunker)
-				enemySupply += 8;
+				enemySupply += 6;
 			else
 				enemySupply += 6;
 		}
@@ -349,7 +366,7 @@ bool sixZerglingTactic::needRetreat()
 			continue;
 	}
 
-	if (ourArmySupply * 1.2 < enemySupply)
+	if (ourArmySupply * 0.8 < enemySupply)
 		return true;
 	else
 		return false;

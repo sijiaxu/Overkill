@@ -61,6 +61,10 @@ class AttackManager{
 	BWAPI::Position			rallyPosition;
 
 	std::set<BWAPI::Unit> enemyInvadeSet;
+
+	BWAPI::Position			naturalChokePosition;
+	BWAPI::Position			baseChokePosition;
+
 	void					groupArmy();
 	bool					isArmyHealthy(BWAPI::UnitType unitType);
 
@@ -78,9 +82,11 @@ class AttackManager{
 	bool					tacticTrigCondition(int tac, BWAPI::Position attackPosition);
 	void					triggerTactic(tacticType tacType, BWAPI::Position attackPosition);
 
-	int						addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, bool addAll = false);
+	int						addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, bool allAirEnemy, bool addAll = false);
 	bool					isFirstMutaAttack;
 	bool					isFirstHydraAttack;
+
+	void					ScoutUpdate();
 
 public:
 	

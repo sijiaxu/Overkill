@@ -24,7 +24,6 @@
 #include "AttackManager.h"
 #include "StrategyManager.h"
 #include "TacticManager.h"
-#include "ScoutManager.h"
 
 #include "Common.h"
 #include "TimeManager.cpp"
@@ -48,6 +47,7 @@ class Overkill : public BWAPI::AIModule
 	
 	openingStrategy						chooseOpeningStrategy;
 	std::vector<std::vector<string>>	historyInfo;
+	std::string winRate;
 	
 
 public:

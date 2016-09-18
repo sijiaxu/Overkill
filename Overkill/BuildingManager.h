@@ -40,7 +40,7 @@ class BuildingManager {
 	BWAPI::TilePosition			getRefineryPosition();
 	bool						canBuildHereWithSpace(BWAPI::TilePosition position, const Building & b, int buildDist, bool horizontalOnly) const;
 	bool						buildable(int x, int y, const Building & b) const;
-	BWAPI::TilePosition			getBuildLocationNear(const Building & b, int buildDist, bool inRegion = false, bool horizontalOnly = false) const;
+	BWAPI::TilePosition			getBuildLocationNear(Building & b, int buildDist, bool inRegion = false, bool horizontalOnly = false) const;
 
 	// functions for performing tedious vector tasks
 
@@ -54,7 +54,7 @@ public:
 	void						addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition desiredLocation);
 
 	//for predict move 
-	BWAPI::TilePosition			getBuildingLocation(const Building & b);
+	BWAPI::TilePosition			getBuildingLocation( Building & b);
 
 	int							getReservedMinerals();
 	int							getReservedGas();

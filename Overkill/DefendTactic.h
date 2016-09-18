@@ -4,9 +4,11 @@
 #include "BattleArmy.h"
 
 
+
 class ArmyDefendTactic : public BattleTactic
 {
 	int retreatJustifyTime;
+	BWAPI::Position naturalChokePosition;
 public:
 	ArmyDefendTactic();
 

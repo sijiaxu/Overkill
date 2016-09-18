@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -30,7 +30,7 @@
     <ClCompile Include="Overkill.cpp" />
     <ClCompile Include="OverLordArmy.cpp" />
     <ClCompile Include="ProductionManager.cpp" />
-    <ClCompile Include="ScoutManager.cpp" />
+    <ClCompile Include="ScoutTactic.cpp" />
     <ClCompile Include="sixZerglingTactic.cpp" />
     <ClCompile Include="StrategyManager.cpp" />
     <ClCompile Include="TacticManager.cpp" />
@@ -54,13 +54,14 @@
     <ClInclude Include="HydraliskTactic.h" />
     <ClInclude Include="InformationManager.h" />
     <ClInclude Include="MetaType.h" />
+    <ClInclude Include="ModelWeightInit.h" />
     <ClInclude Include="MutaliskArmy.h" />
     <ClInclude Include="MutaliskHarassTactic.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="Overkill.h" />
     <ClInclude Include="OverLordArmy.h" />
     <ClInclude Include="ProductionManager.h" />
-    <ClInclude Include="ScoutManager.h" />
+    <ClInclude Include="ScoutTactic.h" />
     <ClInclude Include="sixZerglingTactic.h" />
     <ClInclude Include="StrategyManager.h" />
     <ClInclude Include="TacticManager.h" />
@@ -103,7 +104,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\..\..\..\..\game\starcraft\StarCraft\bwapi-data\AI\</OutDir>
+    <OutDir>..\..\..\..\..\games\StarCraft\bwapi-data\AI</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -117,7 +118,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(BWAPI_DIR)/lib/BWAPI.lib;$(BWTA_DIR)/lib/BWTA.lib;$(BWAPI_DIR)/lib/tinyxml.lib;$(BWAPI_DIR)/lib/CGAL-vc90-mt.lib;$(BWAPI_DIR)/lib/libboost_thread-vc90-mt-1_40.lib;$(BWAPI_DIR)/lib/gmp-vc90-mt.lib;$(BWAPI_DIR)/lib/mpfr-vc90-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(BWAPI_DIR)/lib/BWAPI.lib;$(BWTA_DIR)/lib/BWTA.lib;$(BWTA_DIR)/lib/libboost_system-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libboost_thread-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libCGAL-vc120-mt-4.4.lib;$(BWTA_DIR)/lib/libgmp-10.lib;$(BWTA_DIR)/lib/libmpfr-4.lib;$(BWTA_DIR)/lib/libboost_filesystem-vc120-mt-1_56.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

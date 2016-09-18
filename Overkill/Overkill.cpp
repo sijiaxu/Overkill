@@ -10,7 +10,16 @@ void Overkill::readHistoryFile()
 	historyInfo.clear();
 	fstream historyFile;
 	string enemyName = BWAPI::Broodwar->enemy()->getName();
-	string filePath = "./bwapi-data/read/";
+
+	string filePath;
+	if (curMode == Develop)
+	{
+		filePath = "./bwapi-data/write/";
+	}
+	else
+	{
+		filePath = "./bwapi-data/read/";
+	}
 	filePath += enemyName;
 	
 	//for each enemy, create a file
@@ -23,8 +32,10 @@ void Overkill::readHistoryFile()
 		historyFile.close();
 
 		//default opening strategy
-		chooseOpeningStrategy = NinePoolling;
+		chooseOpeningStrategy = TwelveHatchMuta;//TenHatchMuta;//NinePoolling;
 		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
+
+		StrategyManager::Instance().setOpponentWinrate("-1");
 
 		/*
 		if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
@@ -60,18 +71,22 @@ void Overkill::readHistoryFile()
 
 		//do UCB1 calculate, and set the opening strategy
 		std::map<std::string, std::pair<int, int>> strategyResults;
+		int winCount = 0;
 		for (auto record : historyInfo)
 		{
 			//win
 			if (record[2] == "1")
 			{
 				strategyResults[record[1]].first += 1;
+				winCount += 1;
 			}
 			else
 			{
 				strategyResults[record[1]].second += 1;
 			}
 		}
+		std::string rate = std::to_string(int(10 * float(winCount) / historyInfo.size()));
+		StrategyManager::Instance().setOpponentWinrate(rate);
 
 		double experimentCount = historyInfo.size();
 		std::map<std::string, double> strategyUCB;
@@ -117,8 +132,8 @@ void Overkill::readHistoryFile()
 void Overkill::writeCurrentPlay(bool isWin)
 {
 	fstream historyFile;
-	string enemyName = BWAPI::Broodwar->enemy()->getName();
-	string filePath = "./bwapi-data/write/";
+	std::string enemyName = BWAPI::Broodwar->enemy()->getName();
+	std::string filePath = "./bwapi-data/write/";
 	filePath += enemyName;
 
 	//for each enemy, create a file
@@ -164,7 +179,7 @@ void Overkill::writeCurrentPlay(bool isWin)
 
 void Overkill::onStart()
 {
-	Broodwar->setLocalSpeed(10);
+	Broodwar->setLocalSpeed(0);
 	BWAPI::Broodwar->sendText("gl hf :)");
 
 	//Broodwar->printf("The map is %s, a %d player map", Broodwar->mapName().c_str(), Broodwar->getStartLocations().size());
@@ -200,15 +215,10 @@ void Overkill::onEnd(bool isWinner)
 	int currentSupply = BWAPI::Broodwar->self()->supplyUsed();
 
 	bool win = false;
-	// winner is determined by score
-	if (frameElapse >= 80000)
+
+	if (frameElapse >= 86000 && BWAPI::Broodwar->self()->supplyUsed() >= 150 * 2)
 	{
-		int myScore = StrategyManager::Instance().getScore(BWAPI::Broodwar->self());
-		int enemyScore = StrategyManager::Instance().getScore(BWAPI::Broodwar->enemy());
-		if (currentSupply >= 190 * 2)
-			win = true;
-		else
-			win = false;
+		win = true;
 	}
 	else
 	{
@@ -216,6 +226,53 @@ void Overkill::onEnd(bool isWinner)
 	}
 
 	writeCurrentPlay(win);
+	int reward = win == true ? 100 : -100;
+
+	//TimerManager::Instance().startTimer(TimerManager::strategy);
+	
+	StrategyManager::Instance().strategyChange(reward);
+	StrategyManager::Instance().featureWeightSave();
+	StrategyManager::Instance().featureGradientSave();
+	StrategyManager::Instance().experienceDataSave();
+
+	//TimerManager::Instance().stopTimer(TimerManager::strategy);
+
+	int maxFrameCount = TimerManager::Instance().getMaxFrameCount();
+	int gamePlayLength = frameElapse / (24 * 60);
+	std::string enemyRace;
+	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
+	{
+		enemyRace = "z";
+	}
+	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran)
+	{
+		enemyRace = "T";
+	}
+	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
+	{
+		enemyRace = "p";
+	}
+	else
+		enemyRace = "unknow";
+
+	std::string mapName = BWAPI::Broodwar->mapFileName();
+	std::string maxTimeItem = TimerManager::Instance().getMaxItem();
+	double maxValue = TimerManager::Instance().getMaxFrameValue();
+	//save match result
+	
+	fstream historyFile;
+	string filePath = "./bwapi-data/write/match_result";
+	historyFile.open(filePath.c_str(), ios::app);
+	historyFile << win << ":" << maxFrameCount << ":" << gamePlayLength << ":" << enemyRace << ":" << mapName << ":" << maxTimeItem << ":" << maxValue << endl;
+	historyFile.close();
+
+	//save match count data
+	int matchCount = StrategyManager::Instance().getPlayeMatchCount();
+	filePath = "./bwapi-data/write/match_count";
+	historyFile.open(filePath.c_str(), ios::out);
+	historyFile << (matchCount + 1) << endl;
+	historyFile.close();
+
 }
 
 
@@ -224,7 +281,15 @@ void Overkill::onFrame()
 	if (Broodwar->isReplay())
 		return;
 
+
+	if (curMode == Develop && BWAPI::Broodwar->getFrameCount() >= 86400)
+	{
+		BWAPI::Broodwar->leaveGame();
+	}
+
+
 	drawStats();
+
 
 	/*
 	BOOST_FOREACH(BWAPI::Unit enemy, BWAPI::Broodwar->enemy()->getUnits())
@@ -269,9 +334,9 @@ void Overkill::onFrame()
 		TacticManager::Instance().update();
 		TimerManager::Instance().stopTimer(TimerManager::tactic);
 
-		TimerManager::Instance().startTimer(TimerManager::Scout);
-		ScoutManager::Instance().update();
-		TimerManager::Instance().stopTimer(TimerManager::Scout);
+		//TimerManager::Instance().startTimer(TimerManager::Scout);
+		//ScoutManager::Instance().update();
+		//TimerManager::Instance().stopTimer(TimerManager::Scout);
 
 		TimerManager::Instance().startTimer(TimerManager::strategy);
 		StrategyManager::Instance().update();
@@ -381,9 +446,10 @@ void Overkill::onUnitShow(BWAPI::Unit unit)
 	TacticManager::Instance().onUnitShow(unit);
 	InformationManager::Instance().onUnitShow(unit);
 	//for initial 
-	ScoutManager::Instance().onUnitShow(unit);
+	//ScoutManager::Instance().onUnitShow(unit);
 	WorkerManager::Instance().onUnitShow(unit);
-	if (unit->getPlayer() == BWAPI::Broodwar->self() && unit->getType() == BWAPI::UnitTypes::Zerg_Zergling)
+	//for first overlord
+	if (unit->getPlayer() == BWAPI::Broodwar->self() && (unit->getType() == BWAPI::UnitTypes::Zerg_Zergling || unit->getType() == BWAPI::UnitTypes::Zerg_Overlord))
 	{
 		AttackManager::Instance().onUnitMorph(unit);
 	}
@@ -410,7 +476,7 @@ void Overkill::onUnitDestroy(BWAPI::Unit unit)
 	{
 		ProductionManager::Instance().onUnitDestroy(unit);
 		WorkerManager::Instance().onUnitDestroy(unit);
-		ScoutManager::Instance().onUnitDestroy(unit);
+		//ScoutManager::Instance().onUnitDestroy(unit);
 		if (!unit->getType().isBuilding() && !unit->getType().isWorker())
 		{
 			AttackManager::Instance().onUnitDestroy(unit);
@@ -432,8 +498,8 @@ void Overkill::onUnitMorph(BWAPI::Unit unit)
 	if (unit->getPlayer() == BWAPI::Broodwar->self())
 	{
 		WorkerManager::Instance().onUnitMorph(unit);
-		ScoutManager::Instance().onUnitMorph(unit);
-		if (!unit->getType().isBuilding() && !unit->getType().isWorker() && unit->getType() != BWAPI::UnitTypes::Zerg_Overlord)
+		//ScoutManager::Instance().onUnitMorph(unit);
+		if (!unit->getType().isBuilding() && !unit->getType().isWorker())
 		{
 			AttackManager::Instance().onUnitMorph(unit);
 		}
@@ -478,6 +544,13 @@ void Overkill::drawStats()
 			BWAPI::Broodwar->drawBoxMap(unitPosition.x - unitWidth / 2, unitPosition.y + unitHeight / 2, unitPosition.x + unitWidth / 2, unitPosition.y - unitHeight / 2, BWAPI::Colors::Red, true);
 			double healthPercent = double(unit->getHitPoints()) / unit->getType().maxHitPoints();
 			BWAPI::Broodwar->drawBoxMap(unitPosition.x - unitWidth / 2, unitPosition.y + unitHeight / 2, unitPosition.x - unitWidth / 2 + int(unitWidth * healthPercent), unitPosition.y - unitHeight / 2, BWAPI::Colors::Green, true);
+			/*
+			if (unit->isSelected())
+			{
+				BWAPI::Broodwar->printf("Previous Command Frame=%d Pos=(%d, %d) type=%d", unit->getLastCommandFrame(), unit->getLastCommand().getTargetPosition().x / 32, unit->getLastCommand().getTargetPosition().y / 32, unit->getLastCommand().getType());
+				BWAPI::Broodwar->drawLineMap(unit->getPosition().x, unit->getPosition().y, unit->getLastCommand().getTargetPosition().x, unit->getLastCommand().getTargetPosition().y, BWAPI::Colors::Green);
+				BWAPI::Broodwar->drawCircleMap(unit->getLastCommand().getTargetPosition().x, unit->getLastCommand().getTargetPosition().y, 8, BWAPI::Colors::Green, true);
+			}*/
 		}
 
 		if (unitTypeCounts.find(unit->getType()) == unitTypeCounts.end())
@@ -541,7 +614,7 @@ void Overkill::drawVisibilityData()
 
 void Overkill::drawTerrainData()
 {
-	Broodwar->drawTextScreen(5, 0, "\x04Starts: %d Bases: %d Enemy: %s Frames: %d (%d:%s%d) Map: %s", BWTA::getStartLocations().size(), BWTA::getBaseLocations().size(), Broodwar->enemy()->getRace().getName().c_str(), Broodwar->getFrameCount(), Broodwar->elapsedTime() / 60, (Broodwar->elapsedTime() % 60 < 10) ? "0" : "", Broodwar->elapsedTime() % 60, Broodwar->mapName().c_str());
+	Broodwar->drawTextScreen(5, 0, "\x04Starts: %d Bases: %d Enemy: %s Frames: %d (%d:%s%d) Map: %s", BWTA::getStartLocations().size(), BWTA::getBaseLocations().size(), Broodwar->enemy()->getRace().getName().c_str(), Broodwar->getFrameCount(), Broodwar->getFrameCount() / (24 * 60), (Broodwar->elapsedTime() % 60 < 10) ? "0" : "", Broodwar->elapsedTime() % 60, Broodwar->mapName().c_str());
 
 	//we will iterate through all the base locations, and draw their outlines.
 	//for (std::set<BWTA::BaseLocation*>::const_iterator i = BWTA::getBaseLocations().begin(); i != BWTA::getBaseLocations().end(); i++)

@@ -15,7 +15,7 @@ BuildingManager::BuildingManager()
 void BuildingManager::update()
 {
 	int i = 0;
-
+	
 	for (std::vector<Building>::iterator it = buildingData.begin(); it != buildingData.end();)
 	{
 		switch (it->buildingState)
@@ -148,7 +148,8 @@ void BuildingManager::exploreUnseenPosition(Building& b)
 
 	if (!isBuildingPositionExplored(b))
 	{
-		b.builderUnit->move(BWAPI::Position(b.finalPosition));
+		BattleArmy::smartMove(b.builderUnit, BWAPI::Position(b.finalPosition));
+		//b.builderUnit->move(BWAPI::Position(b.finalPosition));
 	}
 	else
 	{
@@ -181,7 +182,6 @@ void BuildingManager::constructAssignedBuildings(Building& b)
 	// issue the build order!
 	b.builderUnit->build(b.type, b.finalPosition);
 	b.buildingState = Building::buildingOrderCheck;
-	
 }
 
 
@@ -211,7 +211,7 @@ void BuildingManager::buildingOrderCheck(Building& b)
 }
 
 
-BWAPI::TilePosition BuildingManager::getBuildingLocation(const Building & b)
+BWAPI::TilePosition BuildingManager::getBuildingLocation( Building & b)
 {
 	BWAPI::TilePosition testLocation = BWAPI::TilePositions::None;
 
@@ -225,7 +225,7 @@ BWAPI::TilePosition BuildingManager::getBuildingLocation(const Building & b)
 	if (b.type == BWAPI::UnitTypes::Zerg_Creep_Colony) // b.type == BWAPI::UnitTypes::Zerg_Hatchery || 
 		testLocation = getBuildLocationNear(b, 0, false);
 	else
-		testLocation = getBuildLocationNear(b, 1, false);
+		testLocation = getBuildLocationNear(b, 0, false);
 
 	// send back the location
 	return testLocation;
@@ -247,9 +247,9 @@ BWAPI::TilePosition BuildingManager::getRefineryPosition()
 			continue;
 		}
 
-		if (geyser->getDistance(InformationManager::Instance().GetOurBaseUnit()->getPosition()) < closest)
+		if (geyser->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation())) < closest)
 		{
-			closest = geyser->getDistance(InformationManager::Instance().GetOurBaseUnit()->getPosition());
+			closest = geyser->getDistance(BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
 			position = geyser->getTilePosition();
 		}
 	}
@@ -257,7 +257,7 @@ BWAPI::TilePosition BuildingManager::getRefineryPosition()
 }
 
 
-BWAPI::TilePosition BuildingManager::getBuildLocationNear(const Building & b, int buildDist, bool inRegionPriority, bool horizontalOnly) const
+BWAPI::TilePosition BuildingManager::getBuildLocationNear(Building & b, int buildDist, bool inRegionPriority, bool horizontalOnly) const
 {
 	//returns a valid build location near the specified tile position.
 	//searches outward in a spiral.
@@ -280,6 +280,7 @@ BWAPI::TilePosition BuildingManager::getBuildLocationNear(const Building & b, in
 
 			if (iter > 10000)
 			{
+				b.desiredPosition = InformationManager::Instance().getOurNatrualLocation();
 				return BWAPI::TilePositions::None;
 			}
 

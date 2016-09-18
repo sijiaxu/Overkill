@@ -1,9 +1,9 @@
 #pragma once
 #include "Common.h"
 #include "BattleTactic.h"
-#include "InformationManager.h"
+#include "AstarPath.h"
 #include "ZerglingArmy.h"
-#include "AttackManager.h"
+
 
 
 
@@ -12,6 +12,8 @@ class HydraliskTactic : public BattleTactic
 {
 	BWAPI::Position			movePosition;
 	int						mutaliskAttackTime;
+	int						ourArmySupply;
+	int						ourArmyCount;
 
 	std::set<BWAPI::Unit>				nearbyUnits;
 	std::set<BWAPI::Unit>				nearbySunkens;
@@ -26,7 +28,7 @@ public:
 
 	virtual void			update();
 	bool					isTacticEnd();
-	bool					needRetreat();
+	bool					needRetreat(BWAPI::Unit firstUnit);
 	void					generateAttackPath();
 };
 

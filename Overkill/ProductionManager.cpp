@@ -18,7 +18,7 @@ ProductionManager::ProductionManager()
 {
 	populateTypeCharMap();
 
-	setBuildOrder(StrategyManager::Instance().getOpeningBook());
+	setBuildOrder(StrategyManager::Instance().getOpeningBook(), true);
 
 	nextSupplyDeadlockDetectTime = 0;
 
@@ -39,9 +39,11 @@ ProductionManager::ProductionManager()
 	extractorBuildSpeed = 0;
 
 	sunkenWorkerTrigger = true;
+
+	nextStrategyCheckTime = 0;
 }
 
-void ProductionManager::setBuildOrder(const std::vector<MetaType> & buildOrder)
+void ProductionManager::setBuildOrder(const std::vector<MetaType> & buildOrder, bool isBlock)
 {
 	// clear the current build order
 	//queue.clearAll();
@@ -53,12 +55,12 @@ void ProductionManager::setBuildOrder(const std::vector<MetaType> & buildOrder)
 		if (buildOrder[i].isUpgrade() || buildOrder[i].isTech())
 			queue.queueAsLowestPriority(buildOrder[i], false);
 		else
-			queue.queueAsLowestPriority(buildOrder[i], true);
+			queue.queueAsLowestPriority(buildOrder[i], isBlock);
 	}
 }
 
 
-void ProductionManager::triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count)
+void ProductionManager::triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count, bool isBlocking, bool needBuildWorker)
 {
 	openingStrategy opening = StrategyManager::Instance().getCurrentopeningStrategy();
 
@@ -66,18 +68,20 @@ void ProductionManager::triggerBuilding(BWAPI::UnitType buildingType, BWAPI::Til
 	{
 		if (buildingType == BWAPI::UnitTypes::Zerg_Sunken_Colony || buildingType == BWAPI::UnitTypes::Zerg_Spore_Colony)
 		{
-			if (opening != NinePoolling)
+			//if (opening != NinePoolling)
+				//queue.queueAsLowestPriority(MetaType(BWAPI::UnitTypes::Zerg_Drone), false);
+			if (needBuildWorker)
 				queue.queueAsLowestPriority(MetaType(BWAPI::UnitTypes::Zerg_Drone), false);
 			queue.queueAsHighestPriority(MetaType(buildingType), false);
 			queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Creep_Colony, buildingLocation), true);
 		}
 		else if (buildingType == BWAPI::UnitTypes::Zerg_Extractor)
 		{
-			queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Extractor), true);
+			queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Extractor), isBlocking);
 		}
 		else
 		{
-			queue.queueAsHighestPriority(MetaType(buildingType, buildingLocation), true);
+			queue.queueAsHighestPriority(MetaType(buildingType, buildingLocation), isBlocking);
 		}
 	}
 }
@@ -149,12 +153,17 @@ void ProductionManager::defendLostRecover()
 		return;
 
 	std::vector<RecoverBuildingInfo> recoverSunker;
+	std::vector<RecoverBuildingInfo> recoverSporer;
 
 	BOOST_FOREACH(RecoverBuildingInfo u, recoverBuilding)
 	{
 		if (u.buildingType == BWAPI::UnitTypes::Zerg_Sunken_Colony)
 		{
 			recoverSunker.push_back(u);
+		}
+		else if (u.buildingType == BWAPI::UnitTypes::Zerg_Spore_Colony)
+		{
+			recoverSporer.push_back(u);
 		}
 		else
 		{
@@ -166,6 +175,12 @@ void ProductionManager::defendLostRecover()
 	{
 		queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Sunken_Colony), false);
 		queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Creep_Colony, recoverSunker[i].buildingPosition), false);
+	}
+
+	for (int i = 0; i < int(recoverSporer.size()) / 2; i++)
+	{
+		queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Spore_Colony), false);
+		queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Creep_Colony, recoverSporer[i].buildingPosition), false);
 	}
 
 	recoverDroneCount += recoverBuilding.size();
@@ -284,7 +299,7 @@ void ProductionManager::update()
 				{
 					sunkenBuilderTrigger = false;
 					sunkenCanBuild = true;
-					sunkenBuilderTime = BWAPI::Broodwar->getFrameCount() + 8 * 25;
+					sunkenBuilderTime = BWAPI::Broodwar->getFrameCount() + 3 * 25;
 
 				}
 
@@ -302,9 +317,43 @@ void ProductionManager::update()
 				sunkenCanBuild = false;
 				triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1);
 				InformationManager::Instance().addWaitBuildSunkun(1);
+
+				const std::function<void(BWAPI::Game*)> sunkenAction = [=](BWAPI::Game* g)->void
+				{
+					InformationManager::Instance().setDefend(true);
+
+					BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
+					productionState = goalOriented;
+
+					const std::function<void(BWAPI::Game*)> closeAction = [=](BWAPI::Game* g)->void
+					{
+						if (!StrategyManager::Instance().isBuildingMutaliskBuilding())
+						{
+							InformationManager::Instance().setDefend(false);
+						}
+					};
+					const std::function<bool(BWAPI::Game*)> closeCondition = [=](BWAPI::Game* g)->bool
+					{
+						if (BWAPI::Broodwar->getFrameCount() > 6 * 24 * 60)//(BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) == buildCount)
+							return true;
+						else
+							return false;
+					};
+					BWAPI::Broodwar->registerEvent(closeAction, closeCondition, 1, 48);
+				};
+				const std::function<bool(BWAPI::Game*)> sunkenCondition = [=](BWAPI::Game* g)->bool
+				{
+					if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) == 1)
+						return true;
+					else
+						return false;
+				};
+				BWAPI::Broodwar->registerEvent(sunkenAction, sunkenCondition, 1, 48);
 			}
 
 
+
+			/*
 			if (spireTrigger && ourBuilding[BWAPI::UnitTypes::Zerg_Lair].size() > 0 && !(*ourBuilding[BWAPI::UnitTypes::Zerg_Lair].begin())->isCompleted()
 				&& (*ourBuilding[BWAPI::UnitTypes::Zerg_Lair].begin())->getRemainingBuildTime() / double(BWAPI::UnitTypes::Zerg_Lair.buildTime()) < 0.15)
 			{
@@ -325,9 +374,9 @@ void ProductionManager::update()
 			{
 				queue.clearAllUnit();
 				firstMutaTrigger = false;
-				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 7, true, false);
+				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 6, true, true);
 				//for saving larves
-				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 3, true, true);
+				//triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 3, true, true);
 				triggerUnit(BWAPI::UnitTypes::Zerg_Overlord, 1, true, true);
 
 			}
@@ -335,26 +384,11 @@ void ProductionManager::update()
 			//check expand condition
 			if (ourBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*ourBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
 			{
-				if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone) >= 20)
-				{
-					BWAPI::TilePosition nextBase = InformationManager::Instance().GetNextExpandLocation();
-					if (BWAPI::Broodwar->self()->minerals() >= 1000)
-					{
-						queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Hatchery, nextBase), true);
-					}
-					else
-					{
-						int highPriority = queue.getHighestPriorityValue();
-						int lowPriority = queue.getLowestPriorityValue();
-						int itemPriority = lowPriority + int((highPriority - lowPriority) * 0.4);
-						queue.queueItem(BuildOrderItem<PRIORITY_TYPE>(MetaType(BWAPI::UnitTypes::Zerg_Hatchery, nextBase), itemPriority, true));
-					}
-				}
 
 				BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
 				productionState = goalOriented;
-				HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + BWAPI::UnitTypes::Zerg_Hatchery.buildTime();
-			}
+				//HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + BWAPI::UnitTypes::Zerg_Hatchery.buildTime();
+			}*/
 		}
 			break;
 		case NinePoolling:
@@ -371,27 +405,35 @@ void ProductionManager::update()
 				{
 					triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1);
 					InformationManager::Instance().addWaitBuildSunkun(1);
-
-					BWAPI::Broodwar->printf("fix building order finish");
+					BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
 					productionState = goalOriented;
+
+					InformationManager::Instance().setDefend(true);
+					const std::function<void(BWAPI::Game*)> closeAction = [=](BWAPI::Game* g)->void
+					{
+						if (!StrategyManager::Instance().isBuildingMutaliskBuilding())
+						{
+							InformationManager::Instance().setDefend(false);
+						}
+					};
+					const std::function<bool(BWAPI::Game*)> closeCondition = [=](BWAPI::Game* g)->bool
+					{
+						if (BWAPI::Broodwar->getFrameCount() > 6 * 24 * 60)//(BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) == buildCount)
+							return true;
+						else
+							return false;
+					};
+					BWAPI::Broodwar->registerEvent(closeAction, closeCondition, 1, 48);
+
 				};
 				const std::function<bool(BWAPI::Game*)> triggerCondition = [&](BWAPI::Game* g)->bool
 				{
 					return BWAPI::Broodwar->getFrameCount() > sunkenBuilderTime;
 				};
 				BWAPI::Broodwar->registerEvent(triggerAction, triggerCondition, 1, 25);
-			}
-			  
-			/*
-			if (BWAPI::Broodwar->getFrameCount() > sunkenBuilderTime && sunkenCanBuild)
-			{
-				sunkenCanBuild = false;
-				triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1);
-				InformationManager::Instance().addWaitBuildSunkun(1);
 
-				BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
-				productionState = goalOriented;
-			}*/
+			}
+			
 
 		}
 			break;
@@ -407,7 +449,7 @@ void ProductionManager::update()
 				{
 					sunkenBuilderTrigger = false;
 					sunkenCanBuild = true;
-					sunkenBuilderTime = BWAPI::Broodwar->getFrameCount() + 8 * 25;
+					sunkenBuilderTime = BWAPI::Broodwar->getFrameCount() + 2 * 25;
 
 					//WorkerManager::Instance().balanceWorkerOnDepotComplete(u);
 				}
@@ -417,17 +459,62 @@ void ProductionManager::update()
 				{
 					sunkenWorkerTrigger = false;
 					//BWAPI::Unit moveWorker = WorkerManager::Instance().getMoveWorker(BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+
+					if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
+					{
+						WorkerManager::Instance().setMoveWorker(75, 0, BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+					}
+					
 					WorkerManager::Instance().setMoveWorker(75, 0, BWAPI::Position(InformationManager::Instance().getOurNatrualLocation()));
+
+					InformationManager::Instance().setDefend(false);
 				}
 			}
 			if (BWAPI::Broodwar->getFrameCount() > sunkenBuilderTime && sunkenCanBuild)
 			{
 				sunkenCanBuild = false;
-				triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1);
-				InformationManager::Instance().addWaitBuildSunkun(1);
+				int buildCount = 0;
+				buildCount = 2;
+				triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1, true, true);
+				triggerBuilding(BWAPI::UnitTypes::Zerg_Sunken_Colony, InformationManager::Instance().getSunkenBuildingPosition(), 1, true, false);
+				InformationManager::Instance().addWaitBuildSunkun(2);
+
+				const std::function<void(BWAPI::Game*)> sunkenAction = [=](BWAPI::Game* g)->void
+				{
+					InformationManager::Instance().setDefend(true);
+
+					BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
+					productionState = goalOriented;
+
+					const std::function<void(BWAPI::Game*)> closeAction = [=](BWAPI::Game* g)->void
+					{
+						if (!StrategyManager::Instance().isBuildingMutaliskBuilding())
+						{
+							InformationManager::Instance().setDefend(false);
+						}
+						
+					};
+					const std::function<bool(BWAPI::Game*)> closeCondition = [=](BWAPI::Game* g)->bool
+					{
+						if (BWAPI::Broodwar->getFrameCount() > 6 * 24 * 60)//(BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) == buildCount)
+							return true;
+						else
+							return false;
+					};
+					BWAPI::Broodwar->registerEvent(closeAction, closeCondition, 1, 48);
+				};
+				const std::function<bool(BWAPI::Game*)> sunkenCondition = [=](BWAPI::Game* g)->bool
+				{
+					if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) == buildCount)
+						return true;
+					else
+						return false;
+				};
+				BWAPI::Broodwar->registerEvent(sunkenAction, sunkenCondition, 1, 48);
+
 			}
 
-
+			/*
 			if (lairTrigger && getFreeGas() > 100)
 			{
 				//triggerUpgrade(BWAPI::UpgradeTypes::Metabolic_Boost);
@@ -455,35 +542,20 @@ void ProductionManager::update()
 			{
 				queue.clearAllUnit();
 				firstMutaTrigger = false;
-				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 7, true, false);
+				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 6, true, true);
 				//for saving larves
-				triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 3, true, true);
+				//triggerUnit(BWAPI::UnitTypes::Zerg_Mutalisk, 3, true, true);
 				triggerUnit(BWAPI::UnitTypes::Zerg_Overlord, 1, true, true);
 			}
 
 			//check expand condition
 			if (ourBuilding[BWAPI::UnitTypes::Zerg_Spire].size() > 0 && (*ourBuilding[BWAPI::UnitTypes::Zerg_Spire].begin())->isCompleted())
 			{
-				if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone) >= 20)
-				{
-					BWAPI::TilePosition nextBase = InformationManager::Instance().GetNextExpandLocation();
-					if (BWAPI::Broodwar->self()->minerals() >= 1000)
-					{
-						queue.queueAsHighestPriority(MetaType(BWAPI::UnitTypes::Zerg_Hatchery, nextBase), true);
-					}
-					else
-					{
-						int highPriority = queue.getHighestPriorityValue();
-						int lowPriority = queue.getLowestPriorityValue();
-						int itemPriority = lowPriority + int((highPriority - lowPriority) * 0.4);
-						queue.queueItem(BuildOrderItem<PRIORITY_TYPE>(MetaType(BWAPI::UnitTypes::Zerg_Hatchery, nextBase), itemPriority, true));
-					}
-				}
 
 				BWAPI::Broodwar->drawTextScreen(150, 10, "fix building order finish");
 				productionState = goalOriented;
-				HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + BWAPI::UnitTypes::Zerg_Hatchery.buildTime();
-			}
+				//HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + BWAPI::UnitTypes::Zerg_Hatchery.buildTime();
+			}*/
 		}
 			break;
 		default:
@@ -528,14 +600,34 @@ void ProductionManager::onGoalProduction()
 	bool isAllUpgrade = true;
 	for (int i = 0; i < int(queue.size()); i++)
 	{
-		if (!queue[i].metaType.isTech() && !queue[i].metaType.isUpgrade())
+		//if remain unit type is just worker/upgrade/tech, check the strategy
+		if (!queue[i].metaType.isTech() && !queue[i].metaType.isUpgrade() && queue[i].metaType.unitType != BWAPI::UnitTypes::Zerg_Drone
+			&& queue[i].metaType.unitType != BWAPI::UnitTypes::Zerg_Sunken_Colony && queue[i].metaType.unitType != BWAPI::UnitTypes::Zerg_Spore_Colony)
 			isAllUpgrade = false;
 	}
 	if (isAllUpgrade)
 	{
+		if (BWAPI::Broodwar->getFrameCount() > nextStrategyCheckTime)
+		{
+			std::string action = StrategyManager::Instance().strategyChange(0);
+			BWAPI::Broodwar->printf("change strategy to %s", action.c_str());
+			setBuildOrder(StrategyManager::Instance().getStrategyBuildingOrder(action), false);
+
+			nextStrategyCheckTime = BWAPI::Broodwar->getFrameCount() + 24 * 10;
+			curStrategyAction = action;
+		}
+		else
+		{
+			setBuildOrder(StrategyManager::Instance().getStrategyBuildingOrder(curStrategyAction), false);
+			//BWAPI::Broodwar->printf("using current strategy %s", curStrategyAction.c_str());
+		}
+		
+		
+
+		/*
 		const std::vector<MetaType>& buildingItems = StrategyManager::Instance().getCurrentGoalBuildingOrder();
 		queue.queueAsHighestPriority(buildingItems[0], false);
-		/*
+		
 		if (buildingItems.size() > 1)
 		{
 			setBuildOrder(buildingItems);
@@ -564,13 +656,13 @@ void ProductionManager::onDroneProduction()
 	//keep the drone production interval the same as one base's larva production rate
 	if (waitDroneCount < 3 && allUnits[BWAPI::UnitTypes::Zerg_Drone].size() <= 80 && BWAPI::Broodwar->getFrameCount() % droneProductionSpeed == 0)//BWAPI::Broodwar->getFrameCount() % 350 == 0)
 	{
-		/*
+		
 		int highPriority = queue.getHighestPriorityValue();
 		int lowPriority = queue.getLowestPriorityValue();
 		int itemPriority = lowPriority + int((highPriority - lowPriority) * 0.8);
 		queue.queueItem(BuildOrderItem<PRIORITY_TYPE>(MetaType(BWAPI::UnitTypes::Zerg_Drone), itemPriority, true));
-		*/
-		queue.queueAsLowestPriority(MetaType(BWAPI::UnitTypes::Zerg_Drone), true);
+		
+		//queue.queueAsLowestPriority(MetaType(BWAPI::UnitTypes::Zerg_Drone), true);
 	}
 }
 
@@ -590,18 +682,18 @@ void ProductionManager::onExtractorProduction()
 		break;
 	}
 
-	//do expand for gas
+	//if all the occupied region's gas has built and still short for gas, do another expand for gas
 	if (!hasGasPosition && getFreeGas() <= 100 && getFreeMinerals() >= 2000)
 	{
 		StrategyManager::Instance().baseExpand();
 		HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + BWAPI::UnitTypes::Zerg_Hatchery.buildTime();
 	}
 
-	//if has extractor building location && we do not have much gas && have enough worker, build one
+	//if has extractor building location && we do not have much gas && (have enough worker || mineral is too many), build one
 	if (BWAPI::Broodwar->getFrameCount() > extractorProductionCheckTime && hasGasPosition && getFreeGas() <= 500)
 	{
-		//TODO: may cause conflict with fixed strategy
-		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone) >= BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) * 20 + extractorBuildSpeed)
+		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone) >= (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) + 1) * 15 
+			|| getFreeMinerals() >= 1000)
 		{
 			//extractor location is determined in building manager 
 			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Extractor, BWAPI::Broodwar->self()->getStartLocation(), 1);
@@ -615,6 +707,15 @@ void ProductionManager::onHatcheryProduction()
 {
 	if (productionState != goalOriented)
 		return;
+
+	for (int i = queue.size() - 1; i >= 0; i--)
+	{
+		if (queue[i].metaType.unitType == BWAPI::UnitTypes::Zerg_Hatchery)
+		{
+			return;
+		}
+	}
+
 	int larvaCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Larva);
 
 	//check if base is full of worker
@@ -647,10 +748,11 @@ void ProductionManager::onHatcheryProduction()
 	}
 
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& selfAllBuilding = InformationManager::Instance().getOurAllBuildingUnit();
+	//if we do not have much idle larva and has enough mineral, build a hatchery 
 	if (BWAPI::Broodwar->getFrameCount() > HatcheryProductionCheckTime &&
-		((larvaCount && getFreeMinerals() >= 400 && selfAllBuilding[BWAPI::UnitTypes::Zerg_Hatchery].size() <= 15) || !hasIdleDepot))
+		((larvaCount <= 3 && getFreeMinerals() >= 400 && selfAllBuilding[BWAPI::UnitTypes::Zerg_Hatchery].size() <= 15) || !hasIdleDepot))
 	{
-		HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + 25 * 60;
+		HatcheryProductionCheckTime = BWAPI::Broodwar->getFrameCount() + 25 * 40;
 		
 		int workingDepots = ourRegion.size();
 
@@ -728,6 +830,16 @@ void ProductionManager::onUnitDestroy(BWAPI::Unit unit)
 		BWAPI::Broodwar->printf("trigger overlord!!!!!!!!!!!!!!!!!!!");
 		triggerUnit(BWAPI::UnitTypes::Zerg_Overlord, 1);
 	}
+	
+	if (unit->getType() == BWAPI::UnitTypes::Zerg_Creep_Colony)
+	{
+		BWAPI::Broodwar->printf("remove sunken or spornse!!!!!!!!!!!!!!!!!!!");
+		int removeCount = queue.removeUnitType(BWAPI::UnitTypes::Zerg_Sunken_Colony);
+		if (removeCount == 0)
+		{
+			int removeCount = queue.removeUnitType(BWAPI::UnitTypes::Zerg_Spore_Colony);
+		}
+	}
 	// keep the total mutalisk's number
 	
 	/*
@@ -751,6 +863,11 @@ int ProductionManager::getTopProductionNeed()
 		return 0;
 }
 
+bool ProductionManager::IsUpgradeInQueue(BWAPI::UpgradeType up)
+{
+	return queue.isUpgradeInQueue(up);
+}
+
 void ProductionManager::manageBuildOrderQueue()
 {
 	// if there is nothing in the queue, oh well
@@ -761,6 +878,7 @@ void ProductionManager::manageBuildOrderQueue()
 
 	// the current item to be used
 	BuildOrderItem<PRIORITY_TYPE> currentItem = queue.getHighestPriorityItem();
+
 
 	// while there is still something left in the queue, we can skip something and continue build
 	while (!queue.isEmpty())
@@ -902,7 +1020,7 @@ int ProductionManager::OverlordIsBeingBuilt()
 
 // When the next item in the queue is a building, this checks to see if we should move to it
 // This function is here as it needs to access production manager's reserved resources info
-void ProductionManager::predictWorkerMovement(const Building & b)
+void ProductionManager::predictWorkerMovement( Building & b)
 {
 	// get a possible building location for the building
 	if (!haveLocationForThisBuilding)
@@ -1024,7 +1142,23 @@ void ProductionManager::createMetaType(BWAPI::Unit producer, MetaType t)
 		&& t.unitType != BWAPI::UnitTypes::Zerg_Greater_Spire)
 	{
 		// send the building task to the building manager
-		BWAPI::Broodwar->printf("produce building %s", t.unitType.getName().c_str());
+		//BWAPI::Broodwar->printf("produce building %s", t.unitType.getName().c_str());
+		/*
+		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) == 0 && t.unitType == BWAPI::UnitTypes::Zerg_Extractor
+			&& BWAPI::Broodwar->self()->supplyTotal() > 10 * 2)
+		{
+			int checkTime = BWAPI::Broodwar->getFrameCount() + 24 * 30;
+			const std::function<void(BWAPI::Game*)> triggerAction = [=](BWAPI::Game* g)->void
+			{
+				BuildingManager::Instance().addBuildingTask(BWAPI::UnitTypes::Zerg_Extractor, BWAPI::Broodwar->self()->getStartLocation());
+			};
+			const std::function<bool(BWAPI::Game*)> triggerCondition = [=](BWAPI::Game* g)->bool
+			{
+				int cur = BWAPI::Broodwar->getFrameCount();
+				return cur > checkTime;
+			};
+			BWAPI::Broodwar->registerEvent(triggerAction, triggerCondition, 1, 25);
+		}*/
 
 		//predefined building order
 		if (t.buildingPosition == BWAPI::TilePositions::None)
@@ -1050,12 +1184,28 @@ void ProductionManager::createMetaType(BWAPI::Unit producer, MetaType t)
 		if (t.unitType.getRace() == BWAPI::Races::Zerg) {
 			//BWAPI::Broodwar->printf("produce unit %s", t.unitType.getName().c_str());
 			bool result = producer->morph(t.unitType);
-			if (!result)
-			{
-				BWAPI::Broodwar->printf("morph fail!!");
-			}
 
-			// if not, train the unit
+			//for bug: do not have enough resource to produce overlord
+			if (BWAPI::Broodwar->self()->supplyTotal() < 15 * 2 && t.unitType == BWAPI::UnitTypes::Zerg_Overlord)
+			{
+				int checkTime = BWAPI::Broodwar->getFrameCount() + 24 * 20;
+				const std::function<void(BWAPI::Game*)> triggerAction = [=](BWAPI::Game* g)->void
+				{
+					if (producer->exists() && !producer->isMorphing())
+					{
+						BWAPI::Broodwar->printf("morph again!!!");
+						producer->morph(BWAPI::UnitTypes::Zerg_Overlord);
+					}
+				};
+				const std::function<bool(BWAPI::Game*)> triggerCondition = [=](BWAPI::Game* g)->bool
+				{
+					int cur = BWAPI::Broodwar->getFrameCount();
+					return cur > checkTime;
+				};
+				BWAPI::Broodwar->registerEvent(triggerAction, triggerCondition, 1, 25);
+			}
+			
+			
 		}
 		else {
 			producer->train(t.unitType);

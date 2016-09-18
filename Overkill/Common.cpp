@@ -3,3 +3,7 @@
 
 BWAPI::AIModule * __NewAIModule();
 
+developMode curMode = Release;
+
+
+

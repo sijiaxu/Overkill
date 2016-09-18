@@ -84,16 +84,16 @@ void WorkerManager::handleWorkerReact()
 
 void WorkerManager::handleScoutWorker()
 {
-	//send the 10th worker to scout if we have not find the enemy base
-	if (workerData.getWorkers().size() == 9 && InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None &&
-		ScoutManager::Instance().getPossibleEnemyBase().size() > 0 && !assignScout)
+	//send the 9th worker to scout if we have not find the enemy base
+	if (workerData.getWorkers().size() == 9 && InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None && 
+		!assignScout && TacticManager::Instance().isOneTacticRun(ScoutTac))
 	{
 		BOOST_FOREACH(BWAPI::Unit worker, workerData.getWorkers())
 		{
 			if (workerData.getWorkerJob(worker) == WorkerData::Minerals)
 			{
 				setScoutWorker(worker);
-				ScoutManager::Instance().addScoutUnit(worker);
+				TacticManager::Instance().addTacticUnit(ScoutTac, BWAPI::Positions::None, worker);
 				assignScout = true;
 				break;
 			}
@@ -147,14 +147,11 @@ void WorkerManager::updateWorkerStatus()
 void WorkerManager::handleGasWorkers()
 {
 	//if in the middle game stage, we have worker less than 10(means most worker have been killed), mine first
-	if (workerData.getNumWorkers() <= 10 && ProductionManager::Instance().getTopProductionNeed() && BWAPI::Broodwar->getFrameCount() > 5000)
+	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 5000 && ProductionManager::Instance().getTopProductionNeed())
 	{
 		BOOST_FOREACH(BWAPI::Unit unit, workerData.getWorkers())
 		{
-			if (workerData.getWorkerJob(unit) == WorkerData::Gas)
-			{
-				setMineralWorker(unit);
-			}
+			setMineralWorker(unit);
 		}
 		return;
 	}
@@ -307,7 +304,8 @@ void WorkerManager::handleMoveWorkers()
 		{
 			WorkerMoveData data = workerData.getWorkerMoveData(worker);
 
-			worker->move(data.position);
+			BattleArmy::smartMove(worker, data.position);
+			//worker->move(data.position);
 		}
 	}
 }

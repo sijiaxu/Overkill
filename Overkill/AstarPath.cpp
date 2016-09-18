@@ -37,6 +37,7 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	int width = BWAPI::Broodwar->mapWidth();
 	int heigth = BWAPI::Broodwar->mapHeight();
  
+
 	std::priority_queue<fValueGridPoint> openList;
 	//std::tr1::unordered_map<BWAPI::TilePosition, double> openListIndex;
 	std::vector<std::vector<double>> openListIndex;
@@ -61,7 +62,7 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	int expandRate;
 	BWAPI::TilePosition backPosition = BWAPI::TilePositions::None;
 
-	TimerManager::Instance().startTimer(TimerManager::Astar1);
+	//TimerManager::Instance().startTimer(TimerManager::Astar1);
 
 	int canNotFind = 0;
 	if (BWAPI::Broodwar->mapWidth() <= 128 && BWAPI::Broodwar->mapHeight() <= 128)
@@ -86,7 +87,7 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 	// if we expand the end, we find the optimal path
 	while (openList.size() > 0)
 	{
-		TimerManager::Instance().stopTimer(TimerManager::Astar1);
+		//TimerManager::Instance().stopTimer(TimerManager::Astar1);
 		double elapseTime = TimerManager::Instance().getElapseTime(TimerManager::Astar1);
 		if (elapseTime > 50)
 		{
@@ -190,7 +191,7 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 				backtraceList[nextTilePosition.x][nextTilePosition.y] = current.position;
 			}
 		}
-
+		
 		//can not find the solution path
 		if (openList.size() == 0)
 		{
@@ -262,9 +263,164 @@ std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPositio
 		}
 	}*/
 
-	TimerManager::Instance().stopTimer(TimerManager::Astar1);
+	//TimerManager::Instance().stopTimer(TimerManager::Astar1);
 
 	return pathFind;
 }
 
 
+std::list<BWAPI::TilePosition> aStarGroundPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition)
+{
+	TimerManager::Instance().startTimer(TimerManager::Astar1);
+
+	if (BWTA::getRegion(startPosition) == BWTA::getRegion(endPosition) || BWTA::getRegion(startPosition) == NULL)
+	{
+		std::list<BWAPI::TilePosition> pathFind;
+		pathFind.push_back(endPosition);
+		return pathFind;
+	}
+
+	std::set<BWTA::Chokepoint*> allChokePoints = BWTA::getChokepoints();
+	std::map<BWAPI::TilePosition, BWTA::Chokepoint*> positionAtChoke;
+	for (auto c : allChokePoints)
+	{
+		positionAtChoke[BWAPI::TilePosition(c->getCenter())] = c;
+	}
+
+	std::priority_queue<fValueGridPoint> openList;
+	std::vector<std::vector<double>> openListIndex;
+	openListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
+
+	double hValue = diag_distance(double2(endPosition.x - startPosition.x, endPosition.y - startPosition.y));
+	openList.push(fValueGridPoint(startPosition, hValue));
+	openListIndex[startPosition.x][startPosition.y] = 0;
+
+	std::vector<std::vector<BWAPI::TilePosition>> backtraceList;
+	backtraceList.resize(BWAPI::Broodwar->mapWidth(), std::vector<BWAPI::TilePosition>(BWAPI::Broodwar->mapHeight(), BWAPI::TilePositions::None));
+
+	std::vector<std::vector<double>> closeListIndex;
+	closeListIndex.resize(BWAPI::Broodwar->mapWidth(), std::vector<double>(BWAPI::Broodwar->mapHeight(), -1));
+
+	backtraceList[startPosition.x][startPosition.y] = startPosition;
+
+	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
+	BWAPI::TilePosition backPosition = BWAPI::TilePositions::None;
+
+
+
+	int loop1 = 0;
+	int loop2 = 0;
+
+	TimerManager::Instance().startTimer(TimerManager::Astar1);
+	// if we expand the end, we find the optimal path
+	while (openList.size() > 0)
+	{
+		TimerManager::Instance().stopTimer(TimerManager::Astar1);
+		double elapseTime = TimerManager::Instance().getElapseTime(TimerManager::Astar1);
+		if (elapseTime > 2)
+		{
+			std::list<BWAPI::TilePosition> pathFind;
+			pathFind.push_back(endPosition);
+			return pathFind;
+		}
+
+		loop1++;
+
+		fValueGridPoint current = openList.top();
+		closeListIndex[current.position.x][current.position.y] = openListIndex[current.position.x][current.position.y];
+		openList.pop();
+		openListIndex[current.position.x][current.position.y] = -1;
+
+		std::vector<BWAPI::TilePosition> reachablePositions;
+		//if current position is not at choke point
+		if (positionAtChoke.find(current.position) == positionAtChoke.end())
+		{
+			const std::set<BWTA::Chokepoint*>& curRegionChokes = BWTA::getRegion(current.position)->getChokepoints();
+			for (auto c : curRegionChokes)
+			{
+				reachablePositions.push_back(BWAPI::TilePosition(c->getCenter()));
+			}
+		}
+		else
+		{
+			std::set<BWTA::Chokepoint*> candidateChoke;
+			const std::pair<BWTA::Region*, BWTA::Region*>& connectedRegions = positionAtChoke[current.position]->getRegions();
+			candidateChoke.insert(connectedRegions.first->getChokepoints().begin(), connectedRegions.first->getChokepoints().end());
+			candidateChoke.insert(connectedRegions.second->getChokepoints().begin(), connectedRegions.second->getChokepoints().end());
+			candidateChoke.erase(positionAtChoke[current.position]);
+
+			for (auto c : candidateChoke)
+			{
+				reachablePositions.push_back(BWAPI::TilePosition(c->getCenter()));
+			}
+
+			if (connectedRegions.first == BWTA::getRegion(endPosition) || connectedRegions.second == BWTA::getRegion(endPosition))
+			{
+				backPosition = current.position;
+				break;
+			}
+		}
+
+		for (auto nextTilePosition : reachablePositions)
+		{
+			if (nextTilePosition.x > BWAPI::Broodwar->mapWidth() - 1 || nextTilePosition.x < 0
+				|| nextTilePosition.y > BWAPI::Broodwar->mapHeight() - 1 || nextTilePosition.y < 0)
+			{
+				continue;
+			}
+
+			double newCost = 0;
+			newCost = openListIndex[current.position.x][current.position.y] + current.position.getDistance(nextTilePosition);
+
+			//if point have already been expand(if our heuristic function is admissible, this will not happen)
+			//if (closeListIndex[nextTilePosition.x][nextTilePosition.y] != -1 && closeListIndex[nextTilePosition.x][nextTilePosition.y] > newCost)
+				//closeListIndex[nextTilePosition.x][nextTilePosition.y] = -1;
+
+			// if point have already in open point, check the cost value
+			// since std::priority_queue do not have increase-priority interface, so we push the same position twice into the open list 
+			if (openListIndex[nextTilePosition.x][nextTilePosition.y] != -1 && openListIndex[nextTilePosition.x][nextTilePosition.y] > newCost)
+				openListIndex[nextTilePosition.x][nextTilePosition.y] = -1;
+
+			if (openListIndex[nextTilePosition.x][nextTilePosition.y] == -1 && closeListIndex[nextTilePosition.x][nextTilePosition.y] == -1)
+			{
+				loop2++;
+				double fvalue;
+				fvalue = newCost + diag_distance(double2(endPosition.x - nextTilePosition.x, endPosition.y - nextTilePosition.y));
+
+				openList.push(fValueGridPoint(nextTilePosition, fvalue));
+				openListIndex[nextTilePosition.x][nextTilePosition.y] = newCost;
+				backtraceList[nextTilePosition.x][nextTilePosition.y] = current.position;
+			}
+		}
+
+		//can not find the solution path
+		if (openList.size() == 0)
+		{
+			std::list<BWAPI::TilePosition> pathFind;
+			pathFind.push_back(endPosition);
+			return pathFind;
+		}
+	}
+	
+	std::list<BWAPI::TilePosition> pathFind;
+	pathFind.push_front(backPosition);
+	
+	while (backPosition != startPosition)
+	{
+		TimerManager::Instance().stopTimer(TimerManager::Astar1);
+		double elapseTime = TimerManager::Instance().getElapseTime(TimerManager::Astar1);
+		if (elapseTime > 2)
+		{
+			std::list<BWAPI::TilePosition> pathFind;
+			pathFind.push_back(endPosition);
+			return pathFind;
+		}
+
+		pathFind.push_front(backtraceList[backPosition.x][backPosition.y]);
+		backPosition = backtraceList[backPosition.x][backPosition.y];
+	}
+	pathFind.push_back(endPosition);
+	pathFind.erase(pathFind.begin());
+
+	return pathFind;
+}

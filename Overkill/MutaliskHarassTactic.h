@@ -1,9 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "BattleTactic.h"
-#include "InformationManager.h"
 #include "ZerglingArmy.h"
-#include "AttackManager.h"
 #include "AstarPath.h"
 #include "Time.cpp"
 #include "TimeManager.cpp"
@@ -31,16 +29,18 @@ class MutaliskHarassTactic : public BattleTactic
 	BWAPI::Position			moveTarget;
 	int						moveFinishCount;
 	int						triggerChangeTime;
+	std::set<BWAPI::Unit>	friendUnitNearBy;
+	std::set<BWAPI::Unit>	nearbyUnits;
 
 	void					locationAssign(MutaliskArmy* mutalisk, BWAPI::Position endPosition, tacticState nextState, bool nearPosition);
 	void					locationMove(MutaliskArmy* mutalisk, tacticState nextState);
+	
 public:
 	MutaliskHarassTactic();
 
 	virtual void			update();
 	bool					isTacticEnd();
 	virtual void			onUnitShow(BWAPI::Unit unit);
-	virtual void			setAttackPosition(BWAPI::Position targetPosition);
 	virtual bool			hasEnemy();
 	virtual void			addArmyUnit(BWAPI::Unit unit);
 

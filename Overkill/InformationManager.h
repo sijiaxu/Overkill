@@ -120,6 +120,7 @@ class InformationManager {
 	std::vector<std::vector<gridInfo>>			enemyInfluenceMap;
 	void							addUnitInfluenceMap(BWAPI::Unit unit, bool addOrdestroy);
 	void							updateEnemyUnitInfluenceMap();
+	void							setInfluenceMap(BWAPI::Position initPosition, int attackRange, int groundDamage, int airDamage, bool addOrdestroy);
 
 	int								waitToBuildSunker;
 
@@ -133,6 +134,10 @@ class InformationManager {
 	void							checkAirDefend();
 	bool							airDefendTrigger;
 	bool							chamberTrigger;
+
+	bool							needDefendCheck;
+	int								buildZerglingChekcTime;
+	int								defendBuildZerglingsCount;
 
 public:
 	void							setLocationEnemyBase(BWAPI::TilePosition Here);
@@ -153,10 +158,12 @@ public:
 	BWAPI::TilePosition				getOurFirstColonyLocation() { return firstColonyLocation; }
 
 	std::set<BWAPI::Unit>&			getOurAllBaseUnit() { return selfAllBase; }
+	std::set<BWAPI::Unit>&			getEnemyAllBaseUnit() { return enemyAllBase; }
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBattleUnit() { return selfAllBattleUnit; }
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBuildingUnit() { return selfAllBuilding; }
 
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBattleUnit() { return enemyAllBattleUnit; }
+	int								getEnemyGroundBattleUnitSupply();
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBuildingUnit() { return enemyAllBuilding; }
 	std::vector<std::vector<gridInfo>>& getEnemyInfluenceMap() { return enemyInfluenceMap; }
 
@@ -172,8 +179,11 @@ public:
 	void							onUnitDestroy(BWAPI::Unit unit);
 
 	bool							isEarlyRush() { return earlyRush; }
+	bool							isEnemyHasInvisibleUnit();
+	bool							isEnemyHasFlyerAttacker();
 
 	static InformationManager&		Instance();
+	void							setDefend(bool status) { needDefendCheck = status;  if (needDefendCheck == true) BWAPI::Broodwar->printf("defend check open!!!!"); }
 
 	void							update();
 };

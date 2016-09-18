@@ -9,6 +9,8 @@
 #include "HydraliskTactic.h"
 #include "TimeManager.cpp"
 #include "DefendTactic.h"
+#include "ScoutTactic.h"
+
 
 
 struct tacKey
@@ -61,13 +63,15 @@ public:
 
 	static TacticManager&		Instance();
 	int					getTacArmyForce(tacticType tactic, BWAPI::Position attackPosition);
-	void				assignDefendArmy(BWAPI::Position defendPosition, int needSupply);
+	void				assignDefendArmy(BWAPI::Position defendPosition, int needSupply, bool allAirEnemy);
+	void				assignScoutZergling();
 
 	void				onUnitShow(BWAPI::Unit unit);
 
 private:
 	TacticManager() {}
 	std::map<tacKey, BattleTactic*> myTactic;
+	void				addTacticArmyInternal(tacticType tactic, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, BWAPI::UnitType unitType, int count);
 };
 
 

@@ -10,6 +10,18 @@ BuildOrderQueue::BuildOrderQueue()
 
 }
 
+bool BuildOrderQueue::isUpgradeInQueue(BWAPI::UpgradeType up)
+{
+	for (auto i : queue)
+	{
+		if (i.metaType.upgradeType == up)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void BuildOrderQueue::clearAll()
 {
 	// clear the queue
@@ -127,6 +139,20 @@ void BuildOrderQueue::queueAsLowestPriority(MetaType m, bool blocking)
 	// queue the item
 	queueItem(BuildOrderItem<PRIORITY_TYPE>(m, newPriority, blocking));
 }
+
+int BuildOrderQueue::removeUnitType(BWAPI::UnitType uType)
+{
+	for (std::deque< BuildOrderItem<PRIORITY_TYPE>>::iterator it = queue.begin(); it != queue.end();it++)
+	{
+		if (it->metaType.unitType == uType)
+		{
+			it = queue.erase(it);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 
 void BuildOrderQueue::removeHighestPriorityItem()
 {

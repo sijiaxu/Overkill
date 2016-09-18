@@ -81,7 +81,7 @@ class ProductionManager
 	void						manageBuildOrderQueue();
 	void						performCommand(BWAPI::UnitCommandType t);
 	bool						canMakeNow(BWAPI::Unit producer, MetaType t);
-	void						predictWorkerMovement(const Building & b);
+	void						predictWorkerMovement( Building & b);
 
 	bool						detectBuildOrderDeadlock();
 
@@ -116,6 +116,9 @@ class ProductionManager
 	int							droneProductionSpeed;
 	int							extractorBuildSpeed;
 
+	int							nextStrategyCheckTime;
+	std::string					curStrategyAction;
+
 public:
 
 	static ProductionManager &	Instance();
@@ -137,13 +140,15 @@ public:
 	void						defendLostRecover();
 	void						clearDefendVector();
 
-	void						triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count);
+	void						triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count, bool isBlocking = true, bool needBuildWorker = true);
 	void						triggerUnit(BWAPI::UnitType unitType, int unitCount, bool isHighPriority = true, bool isBlocking = false);
-	void						triggerUpgrade(BWAPI::UpgradeType upgrade) { queue.queueAsHighestPriority(MetaType(upgrade), false); }
+	void						triggerUpgrade(BWAPI::UpgradeType upgrade, bool isBlocking = false) { queue.queueAsHighestPriority(MetaType(upgrade), isBlocking); }
 
 	void						clearCurrentQueue(){ queue.clearAllUnit(); }
-	void						setBuildOrder(const std::vector<MetaType> & buildOrder);
+	void						setBuildOrder(const std::vector<MetaType> & buildOrder, bool isBlock);
 
 	void						setDroneProductionSpeed(int productionSpeed) { droneProductionSpeed = productionSpeed; }
 	void						setExtractorBuildSpeed(int buildSpeed) { extractorBuildSpeed = buildSpeed; }
+	bool						IsUpgradeInQueue(BWAPI::UpgradeType up);
+	int							getProductionStage() { return int(productionState); }
 };

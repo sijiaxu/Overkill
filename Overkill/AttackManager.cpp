@@ -14,7 +14,7 @@ AttackManager::AttackManager()
 	isNeedDefend = false;
 	isNeedTacticDefend = false;
 	zerglingHarassFlag = true;
-	unRallyArmy.reserve(100);
+	unRallyArmy.reserve(1000);
 
 	defendState = noEnemy;
 	recoverLostTime = 0;
@@ -22,9 +22,9 @@ AttackManager::AttackManager()
 
 	//get the natural choke 
 	BWAPI::Position natrualLocation = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
-	BWAPI::Position baseChoke = BWTA::getNearestChokepoint(BWAPI::Broodwar->self()->getStartLocation())->getCenter();
-
-	double2 direc = baseChoke - natrualLocation;
+	
+	baseChokePosition = BWTA::getNearestChokepoint(BWAPI::Broodwar->self()->getStartLocation())->getCenter();
+	double2 direc = baseChokePosition - natrualLocation;
 	double2 direcNormal = direc / direc.len();
 
 	int targetx = natrualLocation.x + int(direcNormal.x * 32 * 3);
@@ -44,6 +44,21 @@ AttackManager::AttackManager()
 	hasWorkerScouter = false;
 	isFirstMutaAttack = true;
 	isFirstHydraAttack = true;
+
+	BWTA::Region* nextBase = BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation());
+	double maxDist = 0;
+	BWTA::Chokepoint* maxChoke = nullptr;
+	BOOST_FOREACH(BWTA::Chokepoint* p, nextBase->getChokepoints())
+	{
+		if (InformationManager::Instance().GetOurBaseUnit()->getDistance(p->getCenter()) > maxDist)
+		{
+			maxDist = InformationManager::Instance().GetOurBaseUnit()->getDistance(p->getCenter());
+			naturalChokePosition = p->getCenter();
+			maxChoke = p;
+		}
+	}
+
+	
 }
 
 
@@ -69,40 +84,66 @@ void AttackManager::groupArmy()
 			it++;
 		}
 	}
+
+	int count = 0;
+	//group by outside unit
+	for (auto armyUnits : myArmy)
+	{
+		if (armyUnits.first == BWAPI::UnitTypes::Zerg_Overlord)
+		{
+			for (auto u : armyUnits.second->getUnits())
+			{
+				u.unit->stop();
+			}
+			continue;
+		}
+
+		for (auto u : armyUnits.second->getUnits())
+		{
+			if (myRegions.find(BWTA::getRegion(u.unit->getPosition())) == myRegions.end())
+			{
+				BattleArmy::smartAttackMove(u.unit, rallyPosition);
+				BWAPI::Broodwar->drawLineMap(u.unit->getPosition().x, u.unit->getPosition().y, rallyPosition.x, rallyPosition.y, BWAPI::Colors::Orange);
+			}
+		}
+	}
 }
 
 
 // attack manger trigger for two situation:defend and attack
 void AttackManager::update()
 {
+	//std::list<BWAPI::TilePosition> tmp = aStarGroundPathFinding(InformationManager::Instance().getOurNatrualLocation(), BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition()));
+	//std::list<BWAPI::TilePosition> tt = aStarPathFinding(InformationManager::Instance().getOurNatrualLocation(), BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition()), true);
 	/*
-	if (InformationManager::Instance().GetEnemyBasePosition() != BWAPI::TilePositions::None)
+	if (InformationManager::Instance().GetEnemyBasePosition() != BWAPI::Positions::None)
 	{
-		std::list<BWAPI::TilePosition> tmp = aStarPathFinding(InformationManager::Instance().getOurNatrualLocation(), BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition()), false, true);
+		std::list<BWAPI::TilePosition> tmp = aStarGroundPathFinding(InformationManager::Instance().getOurNatrualLocation(), BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition()));
 		
-		//std::vector<BWAPI::TilePosition> tmp = BWTA::getShortestPath(InformationManager::Instance().getOurNatrualLocation(), BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition()));
 		for (std::list<BWAPI::TilePosition>::iterator it = tmp.begin(); it != tmp.end(); it++)
 		{
 			std::list<BWAPI::TilePosition>::iterator it2 = it;
 			it2++;
 			if (it2 != tmp.end())
 			{
-				BWAPI::Broodwar->drawLineMap(it->x * 32, it->y * 32, it2->x * 32, it2->y * 32, BWAPI::Colors::Purple);
+				BWAPI::Broodwar->drawLineMap(it->x * 32, it->y * 32, it2->x * 32 , it2->y * 32, BWAPI::Colors::Purple);
 			}	
 		}
 	}*/
+	
 
 
 	if (BWAPI::Broodwar->getFrameCount() % 25 == 0)
 		groupArmy();
 
 	DefendUpdate();
+	ScoutUpdate();
 
 	BWAPI::Position attackPosition;
 	//if position has been eliminate or enemy is too strong at the position, change attack position
 	for (int i = 0; i < int(tactictypeEnd); i++)
 	{
-		if (tacticType(i) == MutaPush)
+		if (tacticType(i) == MutaliskHarassTac)
 			attackPosition = getNextAttackPosition(false);
 		else
 			attackPosition = getNextAttackPosition(true);
@@ -110,7 +151,72 @@ void AttackManager::update()
 			return;
 		triggerTactic(tacticType(i), attackPosition);
 	}
+}
 
+
+void AttackManager::ScoutUpdate()
+{
+	int curOverlordCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Overlord);
+	std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Overlord]->getUnits();
+
+	if (BWAPI::Broodwar->getFrameCount() < 24 * 60 * 15)
+	{
+		bool isTacticRunning = TacticManager::Instance().isOneTacticRun(ScoutTac);
+		if (isTacticRunning)
+		{
+			if (curOverlordCount - army.size() < 4)
+			{
+				for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
+				{
+					//can generate safe attack path 
+					TacticManager::Instance().addTacticUnit(ScoutTac, BWAPI::Positions::None, it->unit);
+					it = army.erase(it);
+				}
+			}
+			
+			int checkInterval = 0;
+			if (BWAPI::Broodwar->getFrameCount() >= 4 * 24 * 60 && BWAPI::Broodwar->getFrameCount() < 7 * 24 * 60)
+				checkInterval = 24 * 40;
+			else if (BWAPI::Broodwar->getFrameCount() >= 7 * 24 * 60 && BWAPI::Broodwar->getFrameCount() < 11 * 24 * 60)
+				checkInterval = 24 * 70;
+			else
+				checkInterval = 24 * 100;
+			
+			if (BWAPI::Broodwar->getFrameCount() % checkInterval == 0 && isNeedDefend == false
+				&& BWAPI::Broodwar->getFrameCount() >= 4 * 24 * 60 && BWAPI::Broodwar->getFrameCount() < 15 * 24 * 60)
+			{
+				int armyZerglingCount = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size();
+				if (armyZerglingCount == 0)
+				{
+					TacticManager::Instance().assignScoutZergling();
+				}
+				else
+				{
+					std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits();
+					for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
+					{
+						TacticManager::Instance().addTacticUnit(ScoutTac, BWAPI::Positions::None, it->unit);
+						it = army.erase(it);
+						break;
+					}
+				}
+			}
+			
+		}
+		else
+		{
+			if (InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None)
+			{
+				TacticManager::Instance().addTactic(ScoutTac, BWAPI::Positions::None);
+				std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Overlord]->getUnits();
+				for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
+				{
+					TacticManager::Instance().addTacticUnit(ScoutTac, BWAPI::Positions::None, it->unit);
+					it = army.erase(it);
+				}
+			}
+		}
+	}
 }
 
 
@@ -120,6 +226,7 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 
 	switch (tacType)
 	{
+		/*
 	case ZerglingHarassTac:
 	{
 		if (InformationManager::Instance().GetEnemyBasePosition() == BWAPI::Positions::None)
@@ -131,7 +238,7 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 			if (hasWorkerScouter)
 			{
 				std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits();
-				int addCount = army.size() - 1 >= 0 ? army.size() - 1 : 0;
+				int addCount = army.size() - 2 >= 0 ? army.size() - 2 : 0;
 				if (addCount >= 0)
 				{
 					BWAPI::Position nowAttack = TacticManager::Instance().getTacticPosition(ZerglingHarassTac);
@@ -140,7 +247,7 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 						if (addCount <= 0)
 							break;
 						addCount--;
-						//can generate safe attack path
+
 						TacticManager::Instance().addTacticUnit(ZerglingHarassTac, nowAttack, it->unit);
 						it = army.erase(it);
 					}
@@ -153,7 +260,6 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 			BWAPI::Position nowAttack = TacticManager::Instance().getTacticPosition(ZerglingHarassTac);
 			for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
 			{
-				//can generate safe attack path
 				TacticManager::Instance().addTacticUnit(ZerglingHarassTac, nowAttack, it->unit);
 				it = army.erase(it);
 			}
@@ -162,14 +268,22 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 		{
 			if (tacticTrigCondition(ZerglingHarassTac, attackPosition))
 			{
-				//popAttackPosition(attackPosition);
-				TacticManager::Instance().addTactic(ZerglingHarassTac, attackPosition);
-				//int triggerCount = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 36 ? 36 : myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size();
-				TacticManager::Instance().addTacticArmy(ZerglingHarassTac, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Zergling, 1);//myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size());
+				if (hasWorkerScouter && myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 2)
+				{
+					TacticManager::Instance().addTactic(ZerglingHarassTac, attackPosition);
+					//add only one zergling at start for hasWorkerScouter situation 
+					TacticManager::Instance().addTacticArmy(ZerglingHarassTac, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Zergling, myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() - 2);
+				}
+				else
+				{
+					TacticManager::Instance().addTactic(ZerglingHarassTac, attackPosition);
+					TacticManager::Instance().addTacticArmy(ZerglingHarassTac, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Zergling, myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size());
+				}
+
 			}
 		}
 	}
-		break;
+		break;*/
 	case MutaliskHarassTac:
 	{
 		//trigger mytalisk harass
@@ -203,6 +317,26 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 		isTacticRunning = TacticManager::Instance().isOneTacticRun(HydraliskPushTactic);
 		if (isTacticRunning)
 		{
+			if (hasWorkerScouter)
+			{
+				std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits();
+				int addCount = army.size() - 2 >= 0 ? army.size() - 2 : 0;
+				if (addCount >= 0)
+				{
+					BWAPI::Position nowAttack = TacticManager::Instance().getTacticPosition(HydraliskPushTactic);
+					for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
+					{
+						if (addCount <= 0)
+							break;
+						addCount--;
+
+						TacticManager::Instance().addTacticUnit(HydraliskPushTactic, nowAttack, it->unit);
+						it = army.erase(it);
+					}
+				}
+				return;
+			}
+
 			std::vector<UnitState>& army = myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits();
 			BWAPI::Position nowAttack = TacticManager::Instance().getTacticPosition(HydraliskPushTactic);
 			for (std::vector<UnitState>::iterator it = army.begin(); it != army.end();)
@@ -211,6 +345,14 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 				TacticManager::Instance().addTacticUnit(HydraliskPushTactic, nowAttack, it->unit);
 				it = army.erase(it);
 			}
+
+			std::vector<UnitState>& zerglingArmy = myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits();
+			for (std::vector<UnitState>::iterator it = zerglingArmy.begin(); it != zerglingArmy.end();)
+			{
+				//can generate safe attack path 
+				TacticManager::Instance().addTacticUnit(HydraliskPushTactic, nowAttack, it->unit);
+				it = zerglingArmy.erase(it);
+			}
 		}
 		else
 		{
@@ -218,18 +360,26 @@ void AttackManager::triggerTactic(tacticType tacType, BWAPI::Position attackPosi
 			{
 				TacticManager::Instance().addTactic(HydraliskPushTactic, attackPosition);
 				TacticManager::Instance().addTacticArmy(HydraliskPushTactic, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Hydralisk, myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size());
-				std::vector<BWAPI::Unit> overlordArmy = ScoutManager::Instance().getOverLordArmy(2);
-				BOOST_FOREACH(BWAPI::Unit u, overlordArmy)
+				if (hasWorkerScouter && myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 2)
 				{
-					myArmy[BWAPI::UnitTypes::Zerg_Overlord]->addUnit(u);
+					TacticManager::Instance().addTacticArmy(HydraliskPushTactic, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Zergling, myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() - 2);
 				}
-				TacticManager::Instance().addTacticArmy(HydraliskPushTactic, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Overlord, myArmy[BWAPI::UnitTypes::Zerg_Overlord]->getUnits().size());
+				else
+				{
+					TacticManager::Instance().addTacticArmy(HydraliskPushTactic, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Zergling, myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size());
+				}
+
+				if (InformationManager::Instance().isEnemyHasInvisibleUnit() && BWAPI::Broodwar->getFrameCount() > 5 * 24 * 60)
+				{
+					TacticManager::Instance().addTacticArmy(HydraliskPushTactic, attackPosition, myArmy, BWAPI::UnitTypes::Zerg_Overlord, 2);
+				}
 			}
 		}
 	}
 		break;
 	case DefendTactic:
 		break;
+
 	default:
 		break;
 	}
@@ -244,29 +394,32 @@ bool AttackManager::tacticTrigCondition(int tac, BWAPI::Position attackPosition)
 	if (tac == int(MutaliskHarassTac))
 	{
 		//return !StrategyManager::Instance().mutaliskHarassFlag() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() >= 12; //&& isArmyHealthy(BWAPI::UnitTypes::Zerg_Mutalisk);
+		/*
 		if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran && isFirstMutaAttack)
 		{
 			if (myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() >= 6)
 				isFirstMutaAttack = false;
 			return myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() >= 6;
 		}
-		else
-			return myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() > 0;
+		else */
+		return myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() > 0;
 	}
-	else if (tac == int(ZerglingHarassTac))
+	//else if (tac == int(ZerglingHarassTac))
+	//{
+		//return myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 0;
+	//}
+	else if (tac == int(HydraliskPushTactic))
 	{
-		return myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 0;
-	}
-	else if (tac = int(HydraliskPushTactic))
-	{
-		if (isFirstHydraAttack)
+		return myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() > 0 || myArmy[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size() > 0;
+
+		/*if (isFirstHydraAttack)
 		{
-			if (myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 24)
+			if (myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 12)
 				isFirstHydraAttack = false;
-			return myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 24;
+			return myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 12;
 		}
 		else
-			return  myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 0;
+			return  myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() >= 0;*/
 	}
 	return false;
 }
@@ -274,6 +427,11 @@ bool AttackManager::tacticTrigCondition(int tac, BWAPI::Position attackPosition)
 
 BWAPI::Position	AttackManager::getNextAttackPosition(bool isGround)
 {
+	for (auto b : attackPosition)
+	{
+		b.priority = -1;
+	}
+
 	std::set<BWTA::Region *> enemyRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->enemy());
 	std::set<BWTA::Region *> myRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
 
@@ -319,16 +477,12 @@ BWAPI::Position	AttackManager::getNextAttackPosition(bool isGround)
 
 		i--;
 	}
-	if (isGround)
-	{
-		return attackPosition.back().base;
-	}
 	return BWAPI::Positions::None;
 }
 
 
 
-int AttackManager::addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, bool addAll)
+int AttackManager::addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, bool allAirEnemy, bool addAll)
 {
 	if (addAll)
 	{
@@ -346,6 +500,10 @@ int AttackManager::addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Pos
 		{
 			if (it->second->getUnits().size() > 0 && it->first != BWAPI::UnitTypes::Zerg_Overlord)
 			{
+				if (allAirEnemy == true && it->first == BWAPI::UnitTypes::Zerg_Zergling)
+				{
+					continue;
+				}
 				for (std::vector<UnitState>::iterator itArmy = it->second->getUnits().begin(); itArmy != it->second->getUnits().end();)
 				{
 					if (BWTA::getRegion(itArmy->unit->getPosition()) == BWTA::getRegion(attackPosition) && !itArmy->unit->getType().isBuilding()
@@ -381,7 +539,16 @@ int AttackManager::addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Pos
 			hydraliskSend = needArmySupply / 2 < hydraliskRemain ? needArmySupply / 2 : hydraliskRemain;
 			needArmySupply -= hydraliskSend * 2;
 			if (needArmySupply > 0)
-				zerglingSend = needArmySupply < zerglingRemain ? needArmySupply : zerglingRemain;
+			{
+				if (allAirEnemy == true)
+				{
+					zerglingSend = 0;
+				}
+				else
+				{
+					zerglingSend = needArmySupply < zerglingRemain ? needArmySupply : zerglingRemain;
+				}
+			}
 		}
 		TacticManager::Instance().addTacticArmy(tacType, attackPosition, Army, BWAPI::UnitTypes::Zerg_Mutalisk, mutaliskSend);
 		TacticManager::Instance().addTacticArmy(tacType, attackPosition, Army, BWAPI::UnitTypes::Zerg_Hydralisk, hydraliskSend);
@@ -397,123 +564,122 @@ int AttackManager::addTacArmy(int needArmySupply, tacticType tacType, BWAPI::Pos
 
 void AttackManager::DefendUpdate()
 {
-	std::map<BWTA::Region*, std::set<BWAPI::Unit>> enemyUnitsInRegion;
-	std::map<BWTA::Region*, int> enemyUnitsInRegionSupply;
-	std::map<BWTA::Region*, int> enemyUnitsInRegionFlySupply;
+	//each base corresponding to defend enemy
+	std::map<BWAPI::Position, std::set<BWAPI::Unit>> enemyUnitsInRegion;
+
+	std::map<BWAPI::Position, int> enemyUnitsInRegionSupply;
+	std::map<BWAPI::Position, int> enemyUnitsInRegionFlySupply;
 
 	std::map<BWTA::Region*, std::set<BWAPI::Unit>> enemyUnitsInNeighborRegion;
 	std::map<BWTA::Region*, int> enemyUnitsInNeighborRegionSupply;
 
 	std::set<BWTA::Region *> myRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	std::set<BWAPI::Unit> ourAllBases = InformationManager::Instance().getOurAllBaseUnit();
 
-	//calculate nearby region
-	std::set<BWTA::Region *> myReachableRegions;
-	std::map<BWTA::Region *, BWTA::Region *> reachRegionsBelongsTo;
-	BOOST_FOREACH(BWTA::Region* r, myRegion)
+	BWAPI::Position curP = BWAPI::Positions::None;
+	for (auto enemyUnit : BWAPI::Broodwar->enemy()->getUnits())
 	{
-		if (r != BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())
-			&& r != BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation()))
-			continue;
-
-		const std::set<BWTA::Chokepoint*>& chokes = r->getChokepoints();
-		std::set<BWTA::Region*> reachRegions;
-		BOOST_FOREACH(const BWTA::Chokepoint* c, chokes)
+		if (BWTA::getRegion(enemyUnit->getPosition()) == BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation()))
 		{
-			reachRegions.insert(c->getRegions().first);
-			reachRegions.insert(c->getRegions().second);
+			curP = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
+
+			enemyUnitsInRegion[curP].insert(enemyUnit);
 		}
 
-		for (std::set<BWTA::Region*>::iterator it = reachRegions.begin(); it != reachRegions.end();)
+		if (BWTA::getRegion(enemyUnit->getPosition()) == BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())
+			&& myRegion.find(BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())) != myRegion.end())
 		{
-			if (myRegion.find(*it) != myRegion.end())
-			{
-				reachRegions.erase(it++);
-			}
-			else
-				it++;
-		}
-		
-		BOOST_FOREACH(BWTA::Region* reach, reachRegions)
-		{
-			reachRegionsBelongsTo[reach] = r;
-		}
+			curP = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
 
-		myReachableRegions.insert(reachRegions.begin(), reachRegions.end());
+			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
+
+			enemyUnitsInRegion[curP].insert(enemyUnit);
+		}
 	}
 
-	BOOST_FOREACH(BWAPI::Unit enemyUnit, BWAPI::Broodwar->enemy()->getUnits())
+	//has natural base
+	if (myRegion.find(BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())) != myRegion.end())
 	{
-		// if we do not have anti-air army, ignore
-		if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
-			&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
-			continue;
-
-		//TODO: invisible unit can be get from api
-		if (enemyUnit->getType() == BWAPI::UnitTypes::Protoss_Observer)
-			continue;
-		
-		if (myRegion.find(BWTA::getRegion(enemyUnit->getPosition())) != myRegion.end())
+		BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(naturalChokePosition, 12 * 32, BWAPI::Filter::IsEnemy);
+		for (auto enemyUnit : enemySet)
 		{
-			enemyUnitsInRegion[BWTA::getRegion(enemyUnit->getPosition())].insert(enemyUnit);
+			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
 
+			BWAPI::Position curP = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
+			enemyUnitsInRegion[curP].insert(enemyUnit);
+		}
+	}
+	else
+	{
+		BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(baseChokePosition, 12 * 32, BWAPI::Filter::IsEnemy);
+		for (auto enemyUnit : enemySet)
+		{
+			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
+
+			BWAPI::Position curP = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+			enemyUnitsInRegion[curP].insert(enemyUnit);
+		}
+	}
+
+
+	for (auto b : ourAllBases)
+	{
+		//base region has special enemy detection policy
+		if (BWTA::getRegion(b->getPosition()) == BWTA::getRegion(InformationManager::Instance().getOurNatrualLocation())
+			|| BWTA::getRegion(b->getPosition()) == BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation()))
+		{
+			continue;
+		}
+
+		BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(b->getPosition(), 16 * 32, BWAPI::Filter::IsEnemy);
+		for (auto enemyUnit : enemySet)
+		{
+			// if we do not have anti-air army, ignore
+			if (enemyUnit->getType().isFlyer() && myArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() == 0
+				&& myArmy[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size() == 0)
+				continue;
+
+			if (!enemyUnit->isDetected() && enemyUnit->isVisible())
+				continue;
+
+			enemyUnitsInRegion[b->getPosition()].insert(enemyUnit);
+		}
+	}
+
+	for (auto baseEnemy : enemyUnitsInRegion)
+	{
+		for (auto enemyUnit : baseEnemy.second)
+		{
 			if (!enemyUnit->getType().isBuilding())
 			{
 				if (enemyUnit->getType().isFlyer())
-					enemyUnitsInRegionFlySupply[BWTA::getRegion(enemyUnit->getPosition())] += enemyUnit->getType().supplyRequired();
-				enemyUnitsInRegionSupply[BWTA::getRegion(enemyUnit->getPosition())] += enemyUnit->getType().supplyRequired();
+					enemyUnitsInRegionFlySupply[baseEnemy.first] += enemyUnit->getType().supplyRequired();
+				enemyUnitsInRegionSupply[baseEnemy.first] += enemyUnit->getType().supplyRequired();
 			}
 			else
 			{
 				if (enemyUnit->getType().canAttack())
 				{
-					enemyUnitsInRegionSupply[BWTA::getRegion(enemyUnit->getPosition())] += 8;
+					enemyUnitsInRegionSupply[baseEnemy.first] += 8;
 				}
 				else if (enemyUnit->getType() == BWAPI::UnitTypes::Terran_Bunker)
 				{
-					enemyUnitsInRegionSupply[BWTA::getRegion(enemyUnit->getPosition())] += 12;
+					enemyUnitsInRegionSupply[baseEnemy.first] += 12;
 				}
 				else
-					enemyUnitsInRegionSupply[BWTA::getRegion(enemyUnit->getPosition())] += 1;
+					enemyUnitsInRegionSupply[baseEnemy.first] += 1;
 			}
 		}
-
-		// add enemy to their belonged region
-		else if (myReachableRegions.find(BWTA::getRegion(enemyUnit->getPosition())) != myReachableRegions.end())
-		{
-			enemyUnitsInRegion[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]].insert(enemyUnit);
-			if (!enemyUnit->getType().isBuilding())
-			{
-				if (enemyUnit->getType().isFlyer())
-					enemyUnitsInRegionFlySupply[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]] += enemyUnit->getType().supplyRequired();
-				enemyUnitsInRegionSupply[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]] += enemyUnit->getType().supplyRequired();
-			}
-			else
-			{
-				if (enemyUnit->getType().canAttack())
-				{
-					enemyUnitsInRegionSupply[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]] += 8;
-				}
-				else if (enemyUnit->getType() == BWAPI::UnitTypes::Terran_Bunker)
-				{
-					enemyUnitsInRegionSupply[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]] += 12;
-				}
-				else
-					enemyUnitsInRegionSupply[reachRegionsBelongsTo[BWTA::getRegion(enemyUnit->getPosition())]] += 4;
-			}
-		}
-		else
-			continue;
 	}
-
-	/*
-	//only trigger defend when enemy envade our regions
-	for (std::map<BWTA::Region*, int>::iterator it = enemyUnitsInRegionSupply.begin(); it != enemyUnitsInRegionSupply.end(); it++)
-	{
-		if (it->second != 0)
-		{
-			it->second += enemyUnitsInNeighborRegionSupply[it->first];
-		}
-	}*/
 
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
 	bool hasSunken = false;
@@ -536,10 +702,11 @@ void AttackManager::DefendUpdate()
 		WorkerManager::Instance().finishedWithCombatWorkers();
 		return;
 	}
-	isNeedDefend = true;
+	
 
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& myUnits = InformationManager::Instance().getOurAllBattleUnit();
 	int myTotalArmySupply = 0;
+
 	typedef std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>::value_type metaType;
 	BOOST_FOREACH(metaType& p, myUnits)
 	{
@@ -577,26 +744,18 @@ void AttackManager::DefendUpdate()
 		ZerglingArmy* zerglings = dynamic_cast<ZerglingArmy*>(myArmy[BWAPI::UnitTypes::Zerg_Zergling]);
 		zerglings->attackScoutWorker(*enemyUnitsInRegion.begin()->second.begin());
 	}
-	/*
-	else if (myTotalArmySupply == 0 && !hasSunken)
-	{
-		WorkerManager::Instance().setCombatWorkerArmy(BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Drone));
-	}*/
 	else
 	{
+		isNeedDefend = true;
 		//trig defend tactic
 		std::set<AttackEnemyBase> enemyAttackRegionsPriority;
 		BWAPI::Position myBase = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
-		for (std::map<BWTA::Region*, std::set<BWAPI::Unit>>::iterator it = enemyUnitsInRegion.begin(); it != enemyUnitsInRegion.end(); it++)
+		for (std::map<BWAPI::Position, std::set<BWAPI::Unit>>::iterator it = enemyUnitsInRegion.begin(); it != enemyUnitsInRegion.end(); it++)
 		{
 			if (it->second.size() == 0)
 				continue;
 
-			std::set<BWTA::BaseLocation*> enemyBases = it->first->getBaseLocations();
-			if (enemyBases.size() > 0)
-				enemyAttackRegionsPriority.insert(AttackEnemyBase((*enemyBases.begin())->getPosition(), int(myBase.getDistance((*enemyBases.begin())->getPosition()))));
-			else
-				enemyAttackRegionsPriority.insert(AttackEnemyBase(it->first->getCenter(), int(myBase.getDistance(it->first->getCenter()))));
+			enemyAttackRegionsPriority.insert(AttackEnemyBase(it->first, int(myBase.getDistance(it->first))));
 		}
 
 		typedef std::map<BWAPI::UnitType, BattleArmy*>::value_type mapType;
@@ -609,7 +768,7 @@ void AttackManager::DefendUpdate()
 				myRemainSupply += ((p.first).supplyRequired() * p.second->getUnits().size());
 			}
 
-			int enemySupply = enemyUnitsInRegionSupply[BWTA::getRegion(it->base)];
+			int enemySupply = enemyUnitsInRegionSupply[it->base];
 			
 			std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& myBuildings = InformationManager::Instance().getOurAllBuildingUnit();
 
@@ -618,7 +777,7 @@ void AttackManager::DefendUpdate()
 			{
 				if (BWTA::getRegion(sunker->getPosition()) == BWTA::getRegion((it->base)) && sunker->isCompleted())
 				{
-					sunkenSupply += 8;
+					sunkenSupply += 3;
 				}
 			}
 
@@ -627,20 +786,27 @@ void AttackManager::DefendUpdate()
 			{
 				if (BWTA::getRegion(sunker->getPosition()) == BWTA::getRegion((it->base)) && sunker->isCompleted())
 				{
-					sporeSupply += 8;
+					sporeSupply += 6;
 				}
 			}
-			
-			if (enemyUnitsInRegionFlySupply[BWTA::getRegion(it->base)] > 0)
+
+			bool allAirEnemy = false;
+			if (enemyUnitsInRegionFlySupply[it->base] > 0)
 			{
-				int needAirDefend = enemyUnitsInRegionFlySupply[BWTA::getRegion(it->base)] - sporeSupply <= 0 ? 0 : enemyUnitsInRegionFlySupply[BWTA::getRegion(it->base)];
-				int needGroundDefend = enemySupply - enemyUnitsInRegionFlySupply[BWTA::getRegion(it->base)] - sunkenSupply <= 0 ? 0 : enemySupply - enemyUnitsInRegionFlySupply[BWTA::getRegion(it->base)] - sunkenSupply;
+				int needAirDefend = enemyUnitsInRegionFlySupply[it->base] - sporeSupply <= 0 ? 0 : enemyUnitsInRegionFlySupply[it->base] - sporeSupply;
+				int needGroundDefend = enemySupply - enemyUnitsInRegionFlySupply[it->base] - sunkenSupply <= 0 ? 0 : enemySupply - enemyUnitsInRegionFlySupply[it->base] - sunkenSupply;
 				enemySupply = needAirDefend + needGroundDefend;
+				
+				if (enemySupply > 0 && (needAirDefend * 10 / enemySupply >= 8))
+				{
+					allAirEnemy = true;
+				}
 			}
 			else
 			{
 				enemySupply -= sunkenSupply;
 			}
+
 
 			if (enemySupply <= 0)
 			{
@@ -651,7 +817,7 @@ void AttackManager::DefendUpdate()
 			if (BWAPI::Broodwar->getFrameCount() < 10000)
 				enemySupply = int(enemySupply * 2);
 			else
-				enemySupply = int(enemySupply * 1.2);
+				enemySupply = int(enemySupply * 2);
 
 
 			//do not have any unit to defend
@@ -665,22 +831,22 @@ void AttackManager::DefendUpdate()
 				if (defendTacArmySupply < enemySupply)
 				{
 					int needDefendSupply = enemySupply - defendTacArmySupply;
-					int remainSupply = addTacArmy(needDefendSupply, DefendTactic, it->base, myArmy);
+					int remainSupply = addTacArmy(needDefendSupply, DefendTactic, it->base, myArmy, allAirEnemy);
 					// check if attack tactic need retreat some army to defend
 					if (remainSupply > 0)
 					{
-						TacticManager::Instance().assignDefendArmy(it->base, remainSupply);
+						TacticManager::Instance().assignDefendArmy(it->base, remainSupply, allAirEnemy);
 					}
 				}
 			}
 			else
 			{
 				TacticManager::Instance().addTactic(DefendTactic, it->base);
-				int remainSupply = addTacArmy(enemySupply, DefendTactic, it->base, myArmy);
+				int remainSupply = addTacArmy(enemySupply, DefendTactic, it->base, myArmy, allAirEnemy);
 				// check if attack tactic can retreat some army to defend
 				if (remainSupply > 0)
 				{
-					TacticManager::Instance().assignDefendArmy(it->base, remainSupply);
+					TacticManager::Instance().assignDefendArmy(it->base, remainSupply, allAirEnemy);
 				}
 			}
 		}
@@ -800,34 +966,6 @@ void AttackManager::onUnitMorph(BWAPI::Unit unit)
 		return;
 	}
 	unRallyArmy.push_back(unit);
-
-	/*
-	//if mutalisk harass is executing, mutalisk add to the tactic directly
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Mutalisk && TacticManager::Instance().isTacticRun(MutaliskHarassTac))
-	{
-		TacticManager::Instance().addTacticUnit(MutaliskHarassTac, unit);
-	}
-	else if ((unit->getType() == BWAPI::UnitTypes::Zerg_Hydralisk  \
-		|| unit->getType() == BWAPI::UnitTypes::Zerg_Mutalisk) \
-		&& TacticManager::Instance().isTacticRun(HydraliskPushTactic))
-	{
-		TacticManager::Instance().addTacticUnit(HydraliskPushTactic, unit);
-	}
-	else
-	{
-		unRallyArmy.push_back(unit);
-	}*/
-
-	/*
-	else if (unit->getType() == BWAPI::UnitTypes::Zerg_Hydralisk && TacticManager::Instance().isTacticRun(HydraliskPushTactic))
-	{
-		TacticManager::Instance().addTacticUnit(HydraliskPushTactic, unit);
-	}
-	else
-	{
-		myArmy[unit->getType()]->addUnit(unit);
-		unRallyArmy.push_back(unit);
-	}*/
 }
 
 void AttackManager::onUnitDestroy(BWAPI::Unit unit)
@@ -866,15 +1004,8 @@ void AttackManager::addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& 
 	typedef std::map<BWAPI::UnitType, BattleArmy*>::value_type mapType;
 	BOOST_FOREACH(mapType& p, tacticArmy)
 	{
-		if (p.first == BWAPI::UnitTypes::Zerg_Overlord)
-		{
-			ScoutManager::Instance().giveBackOverLordArmy(p.second);
-		}
-		else
-		{
-			std::vector<UnitState>& t = myArmy[p.first]->getUnits();
-			t.insert(t.end(), p.second->getUnits().begin(), p.second->getUnits().end());
-		}
+		std::vector<UnitState>& t = myArmy[p.first]->getUnits();
+		t.insert(t.end(), p.second->getUnits().begin(), p.second->getUnits().end());
 	}
 
 	//tactic is canceled by defend
@@ -882,26 +1013,29 @@ void AttackManager::addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& 
 		return;
 
 	//for kill scout
-	if (BWAPI::Broodwar->getFrameCount() <= 5000)
-		return;
+	//if (BWAPI::Broodwar->getFrameCount() <= 5000)
+		//return;
 
 	std::set<BWTA::Region *> & enemyRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->enemy());
+
+	BWAPI::Position enemyBase = InformationManager::Instance().GetEnemyBasePosition();
+	BWAPI::Position enemyNatural = InformationManager::Instance().GetEnemyNaturalPosition();
 	
-	if (tacType == MutaPush)
+	if (tacType == MutaliskHarassTac)
 	{
 		BOOST_FOREACH(AttackEnemyBase& b, attackPosition)
 		{
-			if (BWTA::getRegion(attackTarget) == BWTA::getRegion(b.base))
+			if (attackTarget == b.base)//(BWTA::getRegion(attackTarget) == BWTA::getRegion(b.base))
 			{
 				// still our target
 				if (enemyRegions.find(BWTA::getRegion(attackTarget)) != enemyRegions.end())
 				{
-					b.airNextAttackTime = BWAPI::Broodwar->getFrameCount() + 20 * 25;
+					b.airNextAttackTime = BWAPI::Broodwar->getFrameCount() + 80 * 25;
 				}
 				else
 				{
-					b.airNextAttackTime = BWAPI::Broodwar->getFrameCount() + 180 * 25;
-					b.groundNextAttackTime = BWAPI::Broodwar->getFrameCount() + 180 * 25;
+					b.airNextAttackTime = BWAPI::Broodwar->getFrameCount() + 40 * 25;
+					b.groundNextAttackTime = BWAPI::Broodwar->getFrameCount() + 40 * 25;
 				}
 				break;
 			}
@@ -909,6 +1043,40 @@ void AttackManager::addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& 
 	}
 	else
 	{
+		if ((BWTA::getRegion(attackTarget) == BWTA::getRegion(enemyBase) || BWTA::getRegion(attackTarget) == BWTA::getRegion(enemyNatural)) && enemyRegions.find(BWTA::getRegion(attackTarget)) != enemyRegions.end())
+		{
+			BWAPI::Broodwar->printf("do not attack enemy base && natural");
+			BOOST_FOREACH(AttackEnemyBase& b, attackPosition)
+			{
+				if (BWTA::getRegion(b.base) == BWTA::getRegion(enemyBase) || BWTA::getRegion(b.base) == BWTA::getRegion(enemyNatural))
+				{
+					b.groundNextAttackTime = BWAPI::Broodwar->getFrameCount() + 90 * 25;
+				}
+			}
+		}
+		else
+		{
+			BOOST_FOREACH(AttackEnemyBase& b, attackPosition)
+			{
+				if (attackTarget == b.base)//(BWTA::getRegion(attackTarget) == BWTA::getRegion(b.base))
+				{
+					// still our target
+					if (enemyRegions.find(BWTA::getRegion(attackTarget)) != enemyRegions.end())
+					{
+						b.groundNextAttackTime = BWAPI::Broodwar->getFrameCount() + 90 * 25;
+					}
+					else
+					{
+						b.airNextAttackTime = BWAPI::Broodwar->getFrameCount() + 120 * 25;
+						b.groundNextAttackTime = BWAPI::Broodwar->getFrameCount() + 120 * 25;
+					}
+					break;
+				}
+			}
+		}
+		
+
+		/*
 		BWAPI::Position enemyBase = InformationManager::Instance().GetEnemyBasePosition();
 		BWAPI::Position enemyNatural = InformationManager::Instance().GetEnemyNaturalPosition();
 
@@ -938,7 +1106,7 @@ void AttackManager::addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& 
 					}
 				}
 			}
-		}
+		}*/
 		
 	}
 }

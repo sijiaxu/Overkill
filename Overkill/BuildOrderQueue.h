@@ -45,6 +45,7 @@ public:
 	void queueItem(BuildOrderItem<PRIORITY_TYPE> b);			// queues something with a given priority
 	void removeHighestPriorityItem();								// removes the highest priority item
 	void removeCurrentHighestPriorityItem();
+	int removeUnitType(BWAPI::UnitType uType);
 
 	int getHighestPriorityValue() { return highestPriority; }						// returns the highest priority value
 	int	getLowestPriorityValue() { return lowestPriority; }								// returns the lowest priority value
@@ -61,6 +62,7 @@ public:
 	bool hasNextHighestPriorityItem();								// returns the highest priority item
 
 	void drawQueueInformation(int x, int y);
+	bool isUpgradeInQueue(BWAPI::UpgradeType up);
 
 	// overload the bracket operator for ease of use
 	BuildOrderItem<PRIORITY_TYPE> operator [] (int i);
