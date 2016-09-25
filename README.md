@@ -9,8 +9,5 @@ It use three zerg tactics: zergling rush, mutalisk rush and hydralisk rush. it a
 this year's Overkill shorten the opening strategy building length and entirely rely on reinforcement learning model to select unit to build in different game status.
 current RL model has already include some offline training data, about 1000 games played against other bots.
 
-###Competition Results
-CIG 2015: 3rd
-
-AIIDE 2015: 3rd
+Please check out the [Wiki](https://github.com/sijiaxu/Overkill/wiki) for full documentation.
 
