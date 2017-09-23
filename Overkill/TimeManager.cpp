@@ -85,8 +85,7 @@ public:
 
 	void displayTimers(int x, int y)
 	{
-		return;
-		/*
+		//return;
 		
 		BWAPI::Broodwar->drawBoxScreen(x - 5, y - 5, x + 110 + barWidth, y + 5 + (10 * timers.size()), BWAPI::Colors::Black, true);
 		BWAPI::Broodwar->drawTextScreen(x - 30, y - 70, "max frame time is : %.4f", maxTimeConsume);
@@ -121,7 +120,7 @@ public:
 			BWAPI::Broodwar->drawBoxScreen(x + 60, y + yskip, x + 60 + width + 1, y + yskip + 8, BWAPI::Colors::White);
 			BWAPI::Broodwar->drawTextScreen(x + 70 + barWidth, y + yskip - 3, "%.4lf", elapsed);
 			yskip += 10;
-		}*/
+		}
 	}
 
 	static TimerManager& Instance()

@@ -7,8 +7,6 @@ class OverLordArmy : public BattleArmy
 {
 public:
 	OverLordArmy() {}
-	void defend(BWAPI::Position targetPosition);
-	void attack(BWAPI::Position targetPosition);
-
+	std::vector<EnemyUnit>	mixAttack(BWAPI::Position targetPosition, std::set<BWAPI::Unit> enemySet);
 	void follow(BWAPI::Unit target);
 };

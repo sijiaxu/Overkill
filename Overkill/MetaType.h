@@ -2,6 +2,7 @@
 
 #include "Common.h"
 
+
 struct MetaType {
 
 	enum type_enum { Unit, Tech, Upgrade, Command, Default };
@@ -13,10 +14,12 @@ struct MetaType {
 	BWAPI::UpgradeType upgradeType;
 	
 	BWAPI::TilePosition buildingPosition;
+	//for identify the building and unit triggered by strategyChange function
+	std::string unitSourceBuildingAction;
 
 	MetaType() : type(MetaType::Default) { buildingPosition = BWAPI::TilePositions::None; }
-	MetaType(BWAPI::UnitType t) : unitType(t), type(MetaType::Unit) { buildingPosition = BWAPI::TilePositions::None; }
-	MetaType(BWAPI::UnitType t, BWAPI::TilePosition l) : unitType(t), type(MetaType::Unit) { buildingPosition = l; }
+	MetaType(BWAPI::UnitType t, std::string s = "") : unitType(t), type(MetaType::Unit), unitSourceBuildingAction(s) { buildingPosition = BWAPI::TilePositions::None; }
+	MetaType(BWAPI::UnitType t, BWAPI::TilePosition l, std::string s = "") : unitType(t), type(MetaType::Unit), unitSourceBuildingAction(s) { buildingPosition = l; }
 
 	MetaType(BWAPI::TechType t) : techType(t), type(MetaType::Tech) {}
 	MetaType(BWAPI::UpgradeType t) : upgradeType(t), type(MetaType::Upgrade) {}

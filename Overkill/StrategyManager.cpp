@@ -25,11 +25,11 @@ StrategyManager::StrategyManager()
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Sunken_Colony)); //12
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Evolution_Chamber)); //13
 		actions.push_back(MetaType(BWAPI::UnitTypes::Zerg_Hydralisk_Den)); //14
-
+		
 
 		actions.push_back(MetaType(BWAPI::UpgradeTypes::Metabolic_Boost)); // 15
 		actions.push_back(MetaType(BWAPI::UpgradeTypes::Zerg_Carapace)); // 16
-		//Hydralisk
+
 		actions.push_back(MetaType(BWAPI::UpgradeTypes::Grooved_Spines)); // 17
 		actions.push_back(MetaType(BWAPI::UpgradeTypes::Muscular_Augments)); // 18
 
@@ -58,120 +58,307 @@ StrategyManager::StrategyManager()
 	mutaUpgradeTrigger = true;
 	hydraUpgradeTrigger = true;
 	overlordUpgradeTrigger = true;
+	tmpReward = 0;
+	tdStep = 30;
 
+	highLevelActions = decltype(highLevelActions)
+	{
+		//BattleUnit
+		{ "Unit_Zergling", MetaType(BWAPI::UnitTypes::Zerg_Zergling)},
+		{ "Unit_Hydralisk", MetaType(BWAPI::UnitTypes::Zerg_Hydralisk) },
+		{ "Unit_Mutalisk", MetaType(BWAPI::UnitTypes::Zerg_Mutalisk) },
+		{ "Unit_Lurker", MetaType(BWAPI::UnitTypes::Zerg_Lurker) },
+		{ "Unit_Scourage", MetaType(BWAPI::UnitTypes::Zerg_Scourge) },
+		{ "Unit_Ultralisk", MetaType(BWAPI::UnitTypes::Zerg_Ultralisk) },
+		//{ "Unit_Devourer", MetaType(BWAPI::UnitTypes::Zerg_Devourer) },
+		//{ "Unit_Guardian", MetaType(BWAPI::UnitTypes::Zerg_Guardian) },
 
-	//zergling build is the default strategy
-	stateActions = {"zerglingBuild", "hydraBuild", "mutaBuild"};
+		//Defend
+		{ "Defense_Sunken", MetaType(BWAPI::UnitTypes::Zerg_Sunken_Colony) },
+		//{ "Defense_Spore", MetaType(BWAPI::UnitTypes::Zerg_Spore_Colony) },
 
-	actionBuildingTarget["hydraBuild"] = BWAPI::UnitTypes::Zerg_Hydralisk;
-	actionBuildingTarget["mutaBuild"] = BWAPI::UnitTypes::Zerg_Mutalisk;
-	actionBuildingTarget["zerglingBuild"] = BWAPI::UnitTypes::Zerg_Zergling;
+		//TechBuildings
+		{ "Building_Chamber", MetaType(BWAPI::UnitTypes::Zerg_Evolution_Chamber) },
+		{ "Building_Lair", MetaType(BWAPI::UnitTypes::Zerg_Lair) },
+		{ "Building_GreaterSpire", MetaType(BWAPI::UnitTypes::Zerg_Greater_Spire) },
+		{ "Building_Hive", MetaType(BWAPI::UnitTypes::Zerg_Hive) },
+		{ "Building_HydraliskDen", MetaType(BWAPI::UnitTypes::Zerg_Hydralisk_Den) },
+		{ "Building_QueenNest", MetaType(BWAPI::UnitTypes::Zerg_Queens_Nest) },
+		{ "Building_SpawningPool", MetaType(BWAPI::UnitTypes::Zerg_Spawning_Pool) },
+		{ "Building_Spire", MetaType(BWAPI::UnitTypes::Zerg_Spire) },
+		{ "Building_UltraliskCavern", MetaType(BWAPI::UnitTypes::Zerg_Ultralisk_Cavern) },
 
-	//all feature is binary
-	//continue feature is discretized to seven category
-	//the category range is define by its vector 
-	//it is important that action feature represent the action effect on current state, not the action it self.
-	featureNames = decltype(featureNames) {
-		//state feature
-		{"state_general_feature", { 
-			{ "time_", { "6", "12", "20", "30", "max" } },
-			{ "enemyRace_", { "z", "t", "p", "unknow" } },
-			{ "ourSupplyUsed_", { "9", "18", "30", "50", "80", "120", "150", "max" } },
-			//multiply 10
-			{ "enemyWinPercent_", {"0", "2", "4", "6", "8", "9", "max"} },
-			{ "airDistance_", { "64", "96", "128", "160", "196", "228", "max" } },
-			{ "mapWidth_", { "64", "96", "128", "196", "max" } },
-			{ "mapHeight_", { "64", "96", "128", "196", "max" } },
-			{ "ourLarvaCount_", { "0", "1", "3", "6", "9", "12", "16", "20", "max" } },
-			{ "openingStrategy_", { "0", "1", "2" } }
-		}},
+		//TechResearch
+		{ "Tech_LurkerTech", MetaType(BWAPI::TechTypes::Lurker_Aspect) },
 
-		{ "state_tech_feature", {
-			{ "ourTechLevel_", { "hatchery", "lair", "hive" } },
-			{ "ourKeyUpgrade_", { "hasLurker", "hasLordSpeed", "hasLordLoad", "zerglingsAttackSpeed" } }
-		} },
+		//Upgrade
+		{ "Upgrade_ZerglingsSpeed", MetaType(BWAPI::UpgradeTypes::Metabolic_Boost) },
+		{ "Upgrade_ZerglingsAttackSpeed", MetaType(BWAPI::UpgradeTypes::Adrenal_Glands) },
+		{ "Upgrade_OverlordSpeed", MetaType(BWAPI::UpgradeTypes::Pneumatized_Carapace) },
+		{ "Upgrade_HydraliskSpeed", MetaType(BWAPI::UpgradeTypes::Muscular_Augments) },
+		{ "Upgrade_HydraliskRange", MetaType(BWAPI::UpgradeTypes::Grooved_Spines) },
+		{ "Upgrade_UltraliskArmor", MetaType(BWAPI::UpgradeTypes::Chitinous_Plating) },
+		{ "Upgrade_UltraliskSpeed", MetaType(BWAPI::UpgradeTypes::Anabolic_Synthesis) },
 
-		{ "state_building_feature", {
-			{ "ourKeyBuilding_", {"hasSpire"} },
-			{ "enemyKeyBuilding_", { "hasZ_Spire", "hasZ_hive", \
-			"hasT_starPort", "hasT_engineerBay", \
-			"hasP_stargate", "hasP_robotics_facility", "hasP_temple", "hasP_fleet_beacon", "hasP_Citadel" } },
-			{ "enemyP_Gateway_", { "0", "1", "2", "3", "4", "5", "max" } },
-			{ "enemyT_Barracks_", { "0", "1", "2", "3", "4", "5", "max" } },
-			{ "enemyT_Factory_", { "0", "1", "2", "3", "4", "5", "max" } }
+		//Expand
+		{ "Expand_BaseExpand", MetaType(BWAPI::UnitTypes::Zerg_Hatchery) },
 
-		} },
+		//AttackCommand
+		{ "Attack_AllInAttack", MetaType() },
+		{ "Attack_MutaliskHarassAttack", MetaType() },
 
-		{ "state_economy_feature", {
-			{ "ourMineral_", { "100", "200", "300", "500", "800", "1200", "2000","max" } },
-			{ "ourGas_", { "100", "200", "300", "500", "800", "1200", "2000","max" } },
-			{ "ourExpandBase_", { "0","1", "2", "3", "4", "5", "6", "max" } },
-			{ "ourWorkers_", { "6", "12", "20", "30", "50", "70", "max" } },
-			{ "enemyExpandBase_", { "0", "1", "2", "3", "4", "5", "6", "max" } },
-			{ "enemyWorkers_", { "6", "12", "20", "30", "50", "70", "max" } }
-		} },
-
-		{ "state_our_army", {
-			{ "ourSunken_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "ourSpore_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "ourZergling_", { "6", "12", "24", "40", "60", "80", "100", "140", "max" } },
-			{ "ourMutalisk_", { "3", "6", "9", "12", "18", "24", "30", "36", "max" } },
-			{ "ourHydra_", { "6", "12", "18", "24", "36", "48", "60", "max" } }
-		} },
-
-		{ "state_battle_feature", {
-
-			{ "enemyP_cannon_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "enemyT_missile_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "enemyT_Bunker_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "enemyZ_Sunken_", { "1", "2", "3", "5", "8", "12", "max" } },
-			{ "enemyZ_Spore_", { "1", "2", "3", "5", "8", "12", "max" } },
-
-			
-			{ "enemyZ_Zergling_", { "6", "12", "24", "40", "60", "80", "100", "140", "max" } },
-			{ "enemyZ_Mutalisk_", { "3", "6", "9", "12", "18", "24", "30", "36", "max" } },
-			{ "enemyZ_Hydra_", { "6", "12", "18", "24", "36", "48", "60", "max" } },
-			{ "enemyZ_Lurker_", { "6", "12", "18", "24", "30", "36", "max" } },
-
-			{ "enemyP_Zealot_", { "3", "6", "12", "18", "24", "36", "max" } },
-			{ "enemyP_Dragon_", { "3", "6", "12", "18", "24", "36", "max" } },
-			{ "enemyP_High_temple_", { "1", "3", "5", "8", "10", "12", "max" } },
-			{ "enemyP_Carrier_", { "1", "3", "6", "12", "18", "24", "max" } },
-			{ "enemyP_Corsair_", { "3", "6", "12", "18", "24", "30", "max" } },
-			{ "enemyP_Shuttle_", { "1", "2", "3", "5", "7", "9", "max" } },
-
-			{ "enemyT_Goliath_", { "3", "6", "12", "18", "24", "30", "max" } },
-			{ "enemyT_Marine_", { "3", "6", "12", "18", "24", "30", "36", "max" } },
-			{ "enemyT_Tank_", { "3", "6", "12", "18", "24", "30", "max" } },
-			{ "enemyT_Vulture_", { "3", "6", "12", "18", "24", "30", "max" } },
-			{ "enemyT_Dropship_", { "1", "2", "3", "5", "7", "9", "max" } },
-			{ "enemyT_Valkyrie_", { "1", "3", "6", "9", "12", "18", "max" } },
-			{ "enemyT_Science_", { "1", "2", "3", "5", "7", "9", "max" } },
-			{ "enemyT_Firebat_", { "3", "6", "12", "18", "24", "30", "max" } },
-			{ "enemyT_Terran_Medic_", { "1", "2", "3", "5", "7", "9", "12","max" } }
-		} },
-
-		{ "state_raw_combine_feature", {} },
-		{ "action_battle_combine_state_battle_feature", {} }
+		//Wait
+		{ "Wait_doNothing", MetaType() }
 	};
 
-	featureWeightInit();
-	featureCumulativeGradientInit();
-	 
-	//TimerManager::Instance().startTimer(TimerManager::strategy);
-	experienceDataInit();
-	//TimerManager::Instance().stopTimer(TimerManager::strategy);
+	for (auto entry : highLevelActions)
+	{
+		NNOutputAction.push_back(entry.first);
+	}
+
+	for (size_t i = 0; i < NNOutputAction.size(); i++)
+	{
+		actionsOutputIndexMapping[NNOutputAction[i]] = i;
+	}
+
+	for (auto entry : highLevelActions)
+	{
+		if (entry.first.find("Building_") != std::string::npos
+			|| entry.first.find("Expand_") != std::string::npos
+			|| entry.first.find("Defense_") != std::string::npos)
+		{
+			buildingsName[entry.second.unitType] = "building_during_production_" + entry.first;
+		}
+		else if (entry.first.find("Tech_") != std::string::npos)
+		{
+			techsName[entry.second.techType] = "building_during_production_" + entry.first;
+		}
+		else if (entry.first.find("Upgrade_") != std::string::npos)
+		{
+			upgradesName[entry.second.upgradeType] = "building_during_production_" + entry.first;
+		}
+		else
+		{
+			continue;
+		}
+	}
+
+	lastExpandTime = 0;
+
+	//state feature
+	//represent the model input order
+	features = decltype(features)
+	{
+		//state feature
+		{ "time_", { "60" } },
+		{ "enemyRace_z", { "1" } },
+		{ "enemyRace_t", { "1" } },
+		{ "enemyRace_p", { "1" } },
+		{ "enemyRace_unknow", { "1" } },
+
+		{ "ourSupplyUsed_", { "200" } },
+		{ "airDistance_", { "196" } },
+		{ "airDistance_unknow", { "1" } },
+		{ "groundDistance_", { "196" } },
+		{ "groundDistance_unknow", { "1" } },
+		{ "mapMinAirDistance_", { "196" } },
+		{ "mapMinGroundDistance_", { "196" } },
+		{ "mapBaseCount_", { "16" } },
+
+		{ "ourLarvaCount_", { "30" } },
+		{ "openingStrategy_0", { "1" } },
+		{ "openingStrategy_1", { "1" } },
+		{ "openingStrategy_2", { "1" } },
+
+
+		//tech
+		{ "ourKeyUpgrade_LurkerResearch", { "1" } },
+		{ "ourKeyUpgrade_ZerglingsAttackSpeed", { "1" } },
+
+		//building
+		{ "ourKeyBuilding_Spire", { "1" } },
+		{ "ourKeyBuilding_GreaterSpire", { "1" } },
+		{ "ourKeyBuilding_HydraliskDen", { "1" } },
+		{ "ourKeyBuilding_QueenNest", { "1" } },
+		{ "ourKeyBuilding_SpawningPool", { "1" } },
+		{ "ourKeyBuilding_UltraliskCavern", { "1" } },
+		{ "ourKeyBuilding_Lair", { "1" } },
+		{ "ourKeyBuilding_Hive", { "1" } },
+		{ "ourHatchery_", { "10" } },
+		{ "ourExtractor_", { "8" } },
+
+		{ "enemyKeyBuilding_hasZ_Spire", { "1" } },
+		{ "enemyKeyBuilding_hasZ_hive", { "1" } },
+		{ "enemyKeyBuilding_hasZ_Lair", { "1" } },
+		{ "enemyKeyBuilding_hasZ_HydraliskDen", { "1" } },
+		{ "enemyKeyBuilding_hasZ_QueenNest", { "1" } },
+		{ "enemyKeyBuilding_hasZ_SpawningPool", { "1" } },
+
+		{ "enemyKeyBuilding_hasT_starPort", { "1" } },
+		{ "enemyKeyBuilding_hasT_engineerBay", { "1" } },
+		{ "enemyKeyBuilding_hasT_Academy", { "1" } },
+		{ "enemyKeyBuilding_hasT_Armory", { "1" } },
+		{ "enemyKeyBuilding_hasT_scienceFacility", { "1" } },
+
+		{ "enemyKeyBuilding_hasP_robotics_facility", { "1" } },
+		{ "enemyKeyBuilding_hasP_temple", { "1" } },
+		{ "enemyKeyBuilding_hasP_fleet_beacon", { "1" } },
+		{ "enemyKeyBuilding_hasP_Citadel", { "1" } },
+		{ "enemyKeyBuilding_hasP_cybernetics", { "1" } },
+		{ "enemyKeyBuilding_hasP_forge", { "1" } },
+		{ "enemyKeyBuilding_hasP_observatory", { "1" } },
+
+		{ "enemyZ_Hatchery_", { "8" } },
+		{ "enemyP_Gateway_", { "5" } },
+		{ "enemyP_Stargate_", { "5" } },
+		{ "enemyT_Barracks_", { "5" } },
+		{ "enemyT_Factory_", { "5" } },
+
+		//economy
+		{ "ourMineral_", { "2000" } },
+		{ "ourGas_", { "2000" } },
+		{ "ourExpandBase_", { "6" } },
+		{ "ourWorkers_", { "80" } },
+		{ "ourMineralWorkers_", { "60" } },
+		{ "ourMineralLeft_", { "60" } },
+		{ "enemyExpandBase_", { "6" } },
+		{ "enemyWorkers_", { "80" } },
+
+
+		//battleUnit
+		//self
+		{ "ourSunken_", { "12" } },
+		{ "ourSpore_", { "12" } },
+		{ "ourZergling_", { "120" } },
+		{ "ourMutalisk_", { "36" } },
+		{ "ourHydra_", { "60" } },
+		{ "ourLurker_", { "20" } },
+		{ "ourScourage_", { "36" } },
+		{ "ourUltralisk_", { "20" } },
+
+		//self unit in egg
+		{ "ourEggZergling_", { "40" } },
+		{ "ourEggMutalisk_", { "24" } },
+		{ "ourEggHydra_", { "24" } },
+		{ "ourEggLurker_", { "12" } },
+		{ "ourEggScourage_", { "24" } },
+		{ "ourEggUltralisk_", { "12" } },
+
+		//enemy
+		{ "enemyP_cannon_", { "12" } },
+		{ "enemyT_missile_", { "12" } },
+		{ "enemyT_Bunker_", { "12" } },
+		{ "enemyZ_Sunken_", { "12" } },
+		{ "enemyZ_Spore_", { "12" } },
+
+		{ "enemyZ_Zergling_", { "120" } },
+		{ "enemyZ_Mutalisk_", { "36" } },
+		{ "enemyZ_Hydra_", { "48" } },
+		{ "enemyZ_Lurker_", { "20" } },
+		{ "enemyZ_Scourage", { "36" } },
+		{ "enemyZ_Ultralisk", { "20" } },
+		{ "enemyZ_Defiler", { "12" } },
+
+		{ "enemyP_Zealot_", { "36" } },
+		{ "enemyP_Dragon_", { "36" } },
+		{ "enemyP_High_temple_", { "12" } },
+		{ "enemyP_Carrier_", { "24" } },
+		{ "enemyP_Corsair_", { "30" } },
+		{ "enemyP_Shuttle_", { "9" } },
+
+		{ "enemyT_Goliath_", { "30" } },
+		{ "enemyT_Marine_", { "36" } },
+		{ "enemyT_Tank_", { "30" } },
+		{ "enemyT_Vulture_", { "30" } },
+		{ "enemyT_Dropship_", { "9" } },
+		{ "enemyT_Valkyrie_", { "18" } },
+		{ "enemyT_Science_", { "9" } },
+		{ "enemyT_Firebat_", { "30" } },
+		{ "enemyT_Terran_Medic_", { "12" } },
+
+		//during production features
+		{ "building_during_production_Defense_Sunken", { "10" } },
+		//{ "building_during_production_Defense_Spore", { "10" } },
+		{ "execute_Attack_AllInAttack", { "1" } },
+		{ "execute_Attack_MutaliskHarassAttack", { "1" } }
+	};
+
+	for (auto entry : highLevelActions)
+	{
+		if (entry.first.find("Building_") != std::string::npos
+			|| entry.first.find("Expand_") != std::string::npos
+			|| entry.first.find("Tech_") != std::string::npos
+			|| entry.first.find("Upgrade_") != std::string::npos)
+		{
+			features["building_during_production_" + entry.first] = { "1" };
+		}
+	}
+
+	for (auto entry : features)
+	{
+		NNInputAction.push_back(entry.first);
+	}
+
+	/*
+	if (policyModel.deserialize("policy") == -1)
+	{
+		BWAPI::Broodwar->printf("policy model first init!");
+		// neural network initial
+		policyModel.setDepth(3);
+		policyModel.setNodeCountAtLevel(200, 0, Relu);
+		policyModel.setNodeCountAtLevel(100, 1, Relu);
+		policyModel.setNodeCountAtLevel(NNOutputAction.size(), 2, SOFTMAX);
+		policyModel.setNumInputs(NNInputAction.size());
+		policyModel.linkNeurons();
+		policyModel.setLearningRate(0.001);
+		policyModel.initNetwork();
+	}
+	*/
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	if (QValueModel.deserialize(enemyName + "_QValue", readResourceFolder) == -1)
+	{
+		if (QValueModel.deserialize(enemyName + "_QValue", initReadResourceFolder) == -1)
+		{
+			BWAPI::Broodwar->printf("value model first init!");
+			// linear model initial
+			QValueModel.setDepth(3);
+			QValueModel.setNodeCountAtLevel(100, 0, Relu);
+			QValueModel.setNodeCountAtLevel(80, 1, Relu);
+			QValueModel.setNodeCountAtLevel(NNOutputAction.size(), 2, SUM);
+			QValueModel.setNumInputs(NNInputAction.size());
+			QValueModel.linkNeurons();
+			QValueModel.setLearningRate(0.00025);
+			QValueModel.initNetwork();
+		}
+	}
+	if (targetQValueModel.deserialize(enemyName + "_targetQValueModel", readResourceFolder) == -1)
+	{
+		if (targetQValueModel.deserialize(enemyName + "_targetQValueModel", initReadResourceFolder) == -1)
+		{
+			BWAPI::Broodwar->printf("target value model first init!");
+			targetQValueModel.copy(QValueModel);
+		}
+	}
+
+	//QValueModel.setLearningRate(0.00025);
+	
+	
 
 	previousAction = "";
 
 	//add upgrade callback check
-	setArmyUpgrade();
+	//setArmyUpgrade();
+
 	discountRate = 0.99;
 	
 	muteBuilding = true;
 
 	isInBuildingMutalisk = false;
+	nextDefenseBuildTime = 0;
+	replayLength = 6;
+	replayData.setCapacity(10000);
 
+	experienceDataInit();
 }
 
 
@@ -197,7 +384,66 @@ std::string	StrategyManager::getStrategyName(openingStrategy strategy)
 	return openingStrategyName[int(strategy)];
 }
 
+void StrategyManager::setReward(BWAPI::UnitType u, bool addReward) 
+{
+	if (u == BWAPI::UnitTypes::Zerg_Lair || u == BWAPI::UnitTypes::Zerg_Hive)
+	{
+		return;
+	}
 
+	if (addReward)
+	{
+		if (u.isWorker())
+		{
+			tmpReward += double(u.supplyRequired()) / 20;
+		}
+		//expand reward
+		else if (u.isResourceDepot())
+		{
+			tmpReward += 0.5;
+		}
+		else if (u == BWAPI::UnitTypes::Zerg_Overlord)
+		{
+			tmpReward += 0.1;
+		}
+		else if (u.isBuilding() && (u.groundWeapon() != BWAPI::WeaponTypes::None || u.airWeapon() != BWAPI::WeaponTypes::None ||
+			u == BWAPI::UnitTypes::Terran_Bunker))
+		{
+			tmpReward += 0.15;
+		}
+		//encourage kill unit
+		else
+		{
+			tmpReward += double(u.supplyRequired()) / 40;
+		}
+	}
+	
+	else
+	{
+		if (u.isWorker())
+		{
+			tmpReward -= double(u.supplyRequired()) / 20;
+		}
+		//more penalty on lost base
+		else if (u.isResourceDepot())
+		{
+			tmpReward -= 0.5;
+		}
+		else if (u == BWAPI::UnitTypes::Zerg_Overlord)
+		{
+			tmpReward -= 0.1;
+		}
+		
+		//less penalty on loss
+		else
+		{
+			tmpReward -= double(u.supplyRequired()) / 80;
+		}
+		
+	}
+	
+	
+}
 
 
 void StrategyManager::baseExpand()
@@ -213,47 +459,108 @@ void StrategyManager::baseExpand()
 void StrategyManager::experienceDataSave()
 {	
 	string filePath;
-	if (curMode == Develop)
-	{
-		filePath = "./bwapi-data/write/RL_data";
-	}
-	else
-	{
-		string enemyName = BWAPI::Broodwar->enemy()->getName();
-		filePath = "./bwapi-data/write/RL_data";
-		filePath += enemyName;
-	}
-	
-	fstream historyModel;
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	filePath = writeResourceFolder + "RL_data_";
+	filePath += enemyName;
 
+	fstream historyModel;
 	historyModel.open(filePath.c_str(), ios::out);
 	std::vector<std::vector<std::string>> subData;
 
-	//only use the recent 300 experience data.
-	if (experienceData.size() > 3000)
-	{
-		experienceData.erase(experienceData.begin(), experienceData.end() -= 3000);
-	}
+	vector<treeReturnData> experienceData = replayData.getData();
 
-	//store the (St-1, action, r, St) info
-	//scheme Q(St-1) | action | Q(st) | reward |
-	for (auto rlData : experienceData)
+	/*
+	//save test dataSet
+	if (experienceData.size() > 1000)
 	{
-		for (int i = 0; i < 4; i++)
+		filePath = "./bwapi-data/write/testSetData";
+		fstream test;
+		test.open(filePath.c_str(), ios::in);
+		//if do not has this file, init
+		if (!test.is_open())
+		{
+			fstream testSetData;
+			testSetData.open(filePath.c_str(), ios::out);
+			int count = 0;
+			for (auto tmp : experienceData)
+			{
+				vector<string> rlData = tmp.second;
+				count += 1;
+				if (count % 5 != 0)
+				{
+					continue;
+				}
+				for (size_t i = 0; i < rlData.size(); i++)
+				{
+					testSetData << rlData[i];
+					if (i != rlData.size() - 1)
+					{
+						testSetData << "|";
+					}
+				}
+				testSetData << endl;
+			}
+			testSetData.close();
+		}
+	}
+	*/
+
+
+	for (auto tmp : experienceData)
+	{
+		vector<string> rlData = tmp.data;
+		for (size_t i = 0; i < rlData.size(); i++)
 		{
 			historyModel << rlData[i];
-			if (i != 3)
+			if (i != rlData.size() - 1)
 			{
 				historyModel << "|";
 			}
 		}
-		historyModel << endl;
+		historyModel << "|" << tmp.priority << endl;
 	}
 	historyModel.close();
+
+	/*
+	//save for offline test training
+	if (trainingData.size() > 0)
+	{
+		fstream historyFile;
+		string filePath = "./bwapi-data/total_match";
+		historyFile.open(filePath.c_str(), ios::app);
+		for (size_t instance = 0; instance < trainingData.size(); instance++)
+		{
+			for (size_t i = 0; i < trainingData[instance].size(); i++)
+			{
+				historyFile << trainingData[instance][i];
+				if (i != trainingData.size() - 1)
+				{
+					historyFile << "|";
+				}
+			}
+			historyFile << "&";
+		}
+		historyFile << endl;
+		historyFile.close();
+	}
+
+	// save test set performance data
+	if (testSetData.size() > 0)
+	{
+		fstream historyFile;
+		string filePath = "./bwapi-data/write/performace_data";
+		historyFile.open(filePath.c_str(), ios::app);
+		historyFile << testSetAvgQValue;
+		historyFile << endl;
+		historyFile.close();
+	}
+	*/
 }
+
 
 void StrategyManager::featureWeightSave()
 {
+	/*
 	string filePath;
 	if (curMode == Develop)
 	{
@@ -320,11 +627,13 @@ void StrategyManager::featureWeightSave()
 		}
 	}
 	historyModel.close();
+	*/
 }
 
 
 void StrategyManager::featureGradientSave()
 {
+	/*
 	string filePath;
 	if (curMode == Develop)
 	{
@@ -378,22 +687,16 @@ void StrategyManager::featureGradientSave()
 		}
 	}
 	historyModel.close();
+	*/
 }
+
 
 void StrategyManager::experienceDataInit()
 {
 	string filePath;
-	//recent RL data to learn
-	if (curMode == Develop)
-	{
-		filePath = "./bwapi-data/write/RL_data";
-	}
-	else
-	{
-		string enemyName = BWAPI::Broodwar->enemy()->getName();
-		filePath = "./bwapi-data/read/RL_data";
-		filePath += enemyName;
-	}
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	filePath = readResourceFolder + "RL_data_";
+	filePath += enemyName;
 	
 	fstream historyModel;
 
@@ -402,20 +705,26 @@ void StrategyManager::experienceDataInit()
 	if (historyModel.is_open())
 	{
 		string content;
-		//store the (St-1, action, r, St) info
-		//scheme Q(St-1) | action | Q(st) | reward
 		while (getline(historyModel, content))
 		{
 			if (content == "")
 				continue;
-			std::stringstream ss(content);
+			std::stringstream instance(content);
+			string entry;
 			std::vector<string> itemList;
-			string item;
-			while (getline(ss, item, '|'))
+			while (getline(instance, entry, '|'))
 			{
-				itemList.push_back(item);
+				itemList.push_back(entry);
 			}
-			experienceData.push_back(itemList);
+			double priority = std::stod(itemList.back());
+			itemList.pop_back();
+
+			if (itemList.size() != replayLength)
+			{
+				continue;
+			}
+
+			replayData.add(priority, itemList);
 		}
 	}
 	else
@@ -425,14 +734,8 @@ void StrategyManager::experienceDataInit()
 	historyModel.close();
 
 	//get the total match count have player
-	if (curMode == Develop)
-	{
-		filePath = "./bwapi-data/write/match_count";
-	}
-	else
-	{
-		filePath = "./bwapi-data/read/match_count";
-	}
+	filePath = readResourceFolder + "match_count_";
+	filePath += enemyName;
 
 	historyModel.open(filePath.c_str(), ios::in);
 	if (historyModel.is_open())
@@ -457,6 +760,7 @@ void StrategyManager::experienceDataInit()
 
 void StrategyManager::featureWeightInit()
 {
+	/*
 	string filePath;
 	if (curMode == Develop)
 	{
@@ -499,11 +803,13 @@ void StrategyManager::featureWeightInit()
 		}
 	}
 	historyModel.close();
+	*/
 }
 
 
 void StrategyManager::featureCumulativeGradientInit()
 {
+	/*
 	string filePath;
 	if (curMode == Develop)
 	{
@@ -546,236 +852,80 @@ void StrategyManager::featureCumulativeGradientInit()
 		}
 	}
 	historyModel.close();
+	*/
 }
 
 
-std::vector<MetaType> StrategyManager::getStrategyBuildingOrder(std::string stateAction)
+void StrategyManager::getStrategyBuildingOrder()
 {
-	std::vector<MetaType> buildingOrder;
-	BWAPI::UnitType targetType = actionBuildingTarget[stateAction];
-
-	if (targetType == BWAPI::UnitTypes::Zerg_Mutalisk)
+	if (curBuildingAction == "lurkerBuild")
 	{
-		int a = 0;
-	}
-
-	bool needCheck = false;
-	BWAPI::UnitType checkType = targetType;
-	while (true)
-	{
-		std::map<BWAPI::UnitType, int> requireUnits = checkType.requiredUnits();
-		for (auto unit : requireUnits)
+		if (BWAPI::Broodwar->self()->hasResearched(BWAPI::TechTypes::Lurker_Aspect) == false && 
+			BWAPI::Broodwar->self()->isResearching(BWAPI::TechTypes::Lurker_Aspect) == false)
 		{
-			if (unit.first.isBuilding() && BWAPI::Broodwar->self()->allUnitCount(unit.first) == 0)
+			if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) == 0 &&
+				BWAPI::Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) == 0)
+				ProductionManager::Instance().triggerBuildingOrder(BWAPI::UnitTypes::Zerg_Hydralisk_Den, BWAPI::Broodwar->self()->getStartLocation(), curBuildingAction);
+
+			if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 0 &&
+				BWAPI::Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 0)
+				ProductionManager::Instance().triggerBuildingOrder(BWAPI::UnitTypes::Zerg_Lair, BWAPI::Broodwar->self()->getStartLocation(), curBuildingAction);
+
+			const std::function<void(BWAPI::Game*)> lurkerAction = [=](BWAPI::Game* g)->void
 			{
-				buildingOrder.push_back(MetaType(unit.first));
-				needCheck = true;
-				checkType = unit.first;
-			}
-		}
-
-		if (needCheck == false)
-		{
-			break;
-		}
-		else
-		{
-			needCheck = false;
-		}
-	}
-	//if (targetType.gasPrice() > 0 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Extractor) == 0)
-		//buildingOrder.push_back(MetaType(BWAPI::UnitTypes::Zerg_Extractor));
-
-
-	if (stateAction == "mutaBuild" && BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Spire) == 0 && muteBuilding)
-	{
-		muteBuilding = false;
-		isInBuildingMutalisk = true;
-		BWAPI::Broodwar->printf("muta building!!!!!");
-
-		if (BWAPI::Broodwar->getFrameCount() < (10 * 24 * 60))
-		{
-			InformationManager::Instance().setDefend(true);
-		}
-
-		const std::function<void(BWAPI::Game*)> closeAction = [=](BWAPI::Game* g)->void
-		{
-			isInBuildingMutalisk = false;
-			InformationManager::Instance().setDefend(false);
-		};
-		const std::function<bool(BWAPI::Game*)> closeCondition = [=](BWAPI::Game* g)->bool
-		{
-			if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Spire) == 1)
-				return true;
-			else
-				return false;
-		};
-		BWAPI::Broodwar->registerEvent(closeAction, closeCondition, 1, 48);
-		
-		
-		const std::function<void(BWAPI::Game*)> lairAction = [=](BWAPI::Game* g)->void
-		{
-			if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 0)
-				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Lair, BWAPI::Broodwar->self()->getStartLocation(), 1);
-			
-			const std::function<void(BWAPI::Game*)> spireAction = [=](BWAPI::Game* g)->void
-			{
-				ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Spire, BWAPI::Broodwar->self()->getStartLocation(), 1);
+				ProductionManager::Instance().triggerTech(BWAPI::TechTypes::Lurker_Aspect);
 			};
-			const std::function<bool(BWAPI::Game*)> spireCondition = [=](BWAPI::Game* g)->bool
+			const std::function<bool(BWAPI::Game*)> luerkerCondition = [=](BWAPI::Game* g)->bool
 			{
-				if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 1 && BWAPI::Broodwar->self()->minerals() >= 150)
+				if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) == 1
+					&& BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) == 1)
 					return true;
 				else
 					return false;
 			};
-			BWAPI::Broodwar->registerEvent(spireAction, spireCondition, 1, 48);
-		};
-		const std::function<bool(BWAPI::Game*)> lairCondition = [=](BWAPI::Game* g)->bool
+			BWAPI::Broodwar->registerEvent(lurkerAction, luerkerCondition, 1, 48);
+		}
+	}
+	else
+	{
+		BWAPI::UnitType targetBuilding = actionBuildingTarget[curBuildingAction].second;
+		if (BWAPI::Broodwar->self()->completedUnitCount(targetBuilding) == 0 &&
+			BWAPI::Broodwar->self()->incompleteUnitCount(targetBuilding) == 0)
 		{
-			if (BWAPI::Broodwar->self()->gas() >= 100 && BWAPI::Broodwar->self()->minerals() >= 150)
-				return true;
-			else
-				return false;
-		};
-		BWAPI::Broodwar->registerEvent(lairAction, lairCondition, 1, 48);
-		
-		
+			ProductionManager::Instance().triggerBuildingOrder(targetBuilding, BWAPI::Broodwar->self()->getStartLocation(), curBuildingAction);
+		}
 	}
+}
 
-	//std::reverse(buildingOrder.begin(), buildingOrder.end());
 
-	int buildCount = 0;
-	if (stateAction == "hydraBuild")
-	{
-		buildCount = 1;
-	}
-	else if (stateAction == "mutaBuild")
-	{
-		buildingOrder.clear();
-		buildCount = 1;
-	}
-	else if (stateAction == "zerglingBuild")
-	{
-		buildCount = 1;
-	}
-
-	buildingOrder.insert(buildingOrder.end(), buildCount, targetType);
+std::vector<MetaType> StrategyManager::getCurrentStrategyUnit()
+{
+	std::vector<MetaType> buildingOrder;
+	BWAPI::UnitType targetType = actionBuildingTarget[curBuildingAction].first;
+	buildingOrder.insert(buildingOrder.end(), 1, MetaType(targetType, curBuildingAction));
+	/*
 	
+	if (targetType == BWAPI::UnitTypes::Zerg_Lurker)
+	{
+		buildingOrder.insert(buildingOrder.end(), 1, MetaType(BWAPI::UnitTypes::Zerg_Hydralisk, curBuildingAction));
+		buildingOrder.insert(buildingOrder.end(), 1, MetaType(targetType, curBuildingAction));
+	}
+	else if (targetType == BWAPI::UnitTypes::Zerg_Devourer || targetType == BWAPI::UnitTypes::Zerg_Guardian)
+	{
+		buildingOrder.insert(buildingOrder.end(), 1, MetaType(BWAPI::UnitTypes::Zerg_Mutalisk, curBuildingAction));
+		buildingOrder.insert(buildingOrder.end(), 1, MetaType(targetType, curBuildingAction));
+	}
+	else
+	{
+		buildingOrder.insert(buildingOrder.end(), 1, MetaType(targetType, curBuildingAction));
+	}
+	*/
 	return buildingOrder;
 }
 
 
 void StrategyManager::setArmyUpgrade()
 {
-	//overlord speed
-	
-	const std::function<void(BWAPI::Game*)> overlordAction = [=](BWAPI::Game* g)->void
-	{
-		int triggerTime = BWAPI::Broodwar->getFrameCount() + 24 * 10;
-		const std::function<void(BWAPI::Game*)> tAction = [=](BWAPI::Game* g)->void
-		{
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Pneumatized_Carapace);
-		};
-		const std::function<bool(BWAPI::Game*)> tCondition = [=](BWAPI::Game* g)->bool
-		{
-			if (BWAPI::Broodwar->getFrameCount() > triggerTime)
-				return true;
-			else
-				return false;
-		};
-		BWAPI::Broodwar->registerEvent(tAction, tCondition, 1, 48);
-	};
-	const std::function<bool(BWAPI::Game*)> overlordCondition = [=](BWAPI::Game* g)->bool
-	{
-		if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0
-			&& InformationManager::Instance().isEnemyHasInvisibleUnit())
-			return true;
-		else
-			return false;
-	};
-	BWAPI::Broodwar->registerEvent(overlordAction, overlordCondition, 1, 48);
-	
-
-	//hrdrisk attack range and speed
-	const std::function<void(BWAPI::Game*)> HydraliskBaseAction = [=](BWAPI::Game* g)->void
-	{
-		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Grooved_Spines);
-		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Muscular_Augments, true);
-	};
-	const std::function<bool(BWAPI::Game*)> HydraliskBaseCondition = [=](BWAPI::Game* g)->bool
-	{
-		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk) >= 12)
-			return true;
-		else
-			return false;
-	};
-	BWAPI::Broodwar->registerEvent(HydraliskBaseAction, HydraliskBaseCondition, 1, 48);
-
-	//zergling speed
-	const std::function<void(BWAPI::Game*)> ZerglingBaseAction = [=](BWAPI::Game* g)->void
-	{
-		int maxLvl = BWAPI::Broodwar->self()->getMaxUpgradeLevel(BWAPI::UpgradeTypes::Metabolic_Boost);
-		int currentLvl = BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Metabolic_Boost);
-		bool isInQueue = ProductionManager::Instance().IsUpgradeInQueue(BWAPI::UpgradeTypes::Metabolic_Boost);
-		if (!isInQueue && !BWAPI::Broodwar->self()->isUpgrading(BWAPI::UpgradeTypes::Metabolic_Boost) && currentLvl < maxLvl)
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Metabolic_Boost);
-	};
-	const std::function<bool(BWAPI::Game*)> ZerglingBaseCondition = [=](BWAPI::Game* g)->bool
-	{
-		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Zergling) >= 12)
-			return true;
-		else
-			return false;
-	};
-	BWAPI::Broodwar->registerEvent(ZerglingBaseAction, ZerglingBaseCondition, 1, 48);
-
-	//zergling attack
-	const std::function<void(BWAPI::Game*)> ZerglingFastAttackAction = [=](BWAPI::Game* g)->void
-	{
-		ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Queens_Nest, BWAPI::Broodwar->self()->getStartLocation(), 1);
-
-		const std::function<bool(BWAPI::Game*)> buildHiveCondition = [=](BWAPI::Game* g)->bool
-		{
-			if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Queens_Nest) > 0)
-				return true;
-			else
-				return false;
-		};
-
-		const std::function<void(BWAPI::Game*)> buildHiveAction = [=](BWAPI::Game* g)->void
-		{
-			ProductionManager::Instance().triggerBuilding(BWAPI::UnitTypes::Zerg_Hive, BWAPI::Broodwar->self()->getStartLocation(), 1);
-
-			const std::function<bool(BWAPI::Game*)> upZAttackCondition = [=](BWAPI::Game* g)->bool
-			{
-				if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0)
-					return true;
-				else
-					return false;
-			};
-
-			const std::function<void(BWAPI::Game*)> upZAttackAction = [=](BWAPI::Game* g)->void
-			{
-				ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Adrenal_Glands, true);
-			};
-
-			BWAPI::Broodwar->registerEvent(upZAttackAction, upZAttackCondition, 1, 48);
-
-		};
-		BWAPI::Broodwar->registerEvent(buildHiveAction, buildHiveCondition, 1, 48);
-
-	};
-	const std::function<bool(BWAPI::Game*)> ZerglingFastAttackCondition = [=](BWAPI::Game* g)->bool
-	{
-		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Zergling) >= 36 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Lair) > 0)
-			return true;
-		else
-			return false;
-	};
-	BWAPI::Broodwar->registerEvent(ZerglingFastAttackAction, ZerglingFastAttackCondition, 1, 48);
-
-
 	//hydrisk/lurker attack && defend upgrade
 	const std::function<void(BWAPI::Game*)> GroundRangeAction = [=](BWAPI::Game* g)->void
 	{
@@ -894,7 +1044,7 @@ void StrategyManager::setArmyUpgrade()
 			return false;
 	};
 	BWAPI::Broodwar->registerEvent(AirAction, AirCondition, -1, 24 * 20);
-
+	
 }
 
 
@@ -919,12 +1069,19 @@ std::string	StrategyManager::getCategory(std::vector<std::string>& categoryRange
 }
 
 
+double StrategyManager::getNormalizedValue(std::vector<std::string>& categoryRange, int curValue)
+{
+	int rangeValue = std::stoi(categoryRange[0]);
+	//scale to [-1, 1] range
+	return (curValue / double(rangeValue)) * 2 - 1;
+}
+
+
 void StrategyManager::calCurrentStateFeature()
 {
 	//state general
 	int curTimeMinuts = BWAPI::Broodwar->getFrameCount() / (24 * 60);
-	std::string timeName = getCategory(featureNames["state_general_feature"]["time_"], curTimeMinuts, "time_");
-	featureValue["state_general_feature"][timeName] = 1;
+	featureValues["time_"] = getNormalizedValue(features["time_"], curTimeMinuts);
 	BWAPI::UnitType enemyWork = BWAPI::UnitTypes::None;
 	int featureCount = 0;
 
@@ -932,1016 +1089,1496 @@ void StrategyManager::calCurrentStateFeature()
 	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
 	{
 		enemyRaceName = "enemyRace_z";
-		featureValue["state_general_feature"]["enemyRace_z"] = 1;
+		featureValues["enemyRace_z"] = 1;
 		enemyWork = BWAPI::UnitTypes::Zerg_Drone;
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran)
 	{
 		enemyRaceName = "enemyRace_t";
-		featureValue["state_general_feature"]["enemyRace_t"] = 1;
+		featureValues["enemyRace_t"] = 1;
 		enemyWork = BWAPI::UnitTypes::Terran_SCV;
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
 	{
 		enemyRaceName = "enemyRace_p";
-		featureValue["state_general_feature"]["enemyRace_p"] = 1;
+		featureValues["enemyRace_p"] = 1;
 		enemyWork = BWAPI::UnitTypes::Protoss_Probe;
 	}
 	else
 	{
 		enemyRaceName = "enemyRace_unknow";
-		featureValue["state_general_feature"]["enemyRace_unknow"] = 1;
+		featureValues["enemyRace_unknow"] = 1;
 	}
-		
-
 	int supplyUsed = BWAPI::Broodwar->self()->supplyUsed() / 2;
-	featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["ourSupplyUsed_"], supplyUsed, "ourSupplyUsed_")] = 1;
+	featureValues["ourSupplyUsed_"] = getNormalizedValue(features["ourSupplyUsed_"], supplyUsed);
 
-	if (opponentWinrate != "-1")
-		featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["enemyWinPercent_"], stoi(opponentWinrate), "enemyWinPercent_")] = 1;
+	std::map<BWTA::Region*, int>& baseGroundDistanceInfo = InformationManager::Instance().getBaseGroudDistance();
+	std::map<BWTA::Region*, int>& baseAirDistanceInfo = InformationManager::Instance().getBaseAirDistance();
 
-	int mapWidth = BWAPI::Broodwar->mapWidth();
-	featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["mapWidth_"], mapWidth, "mapWidth_")] = 1;
-
-	int mapHeight = BWAPI::Broodwar->mapHeight();
-	featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["mapHeight_"], mapHeight, "mapHeight_")] = 1;
 	if (InformationManager::Instance().GetEnemyBasePosition() != BWAPI::Positions::None)
 	{
-		BWAPI::TilePosition enemyBase = BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition());
-		double airDistance = enemyBase.getDistance(BWAPI::Broodwar->self()->getStartLocation());
-		featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["airDistance_"], int(airDistance), "airDistance_")] = 1;
+		int airDistance = baseAirDistanceInfo[BWTA::getRegion(InformationManager::Instance().GetEnemyBasePosition())];
+		featureValues["airDistance_"] = getNormalizedValue(features["airDistance_"], airDistance);
+		int groundDistance = baseGroundDistanceInfo[BWTA::getRegion(InformationManager::Instance().GetEnemyBasePosition())];
+		featureValues["groundDistance_"] = getNormalizedValue(features["groundDistance_"], groundDistance);
 	}
-	std::string mapStr = BWAPI::Broodwar->mapFileName();
-	mapStr.erase(std::remove(mapStr.begin(), mapStr.end(), ' '), mapStr.end());
-	std::string mapName = "mapName_" + mapStr; //BWAPI::Broodwar->mapFileName();
-	featureValue["state_general_feature"][mapName] = 1;
+	else
+	{
+		featureValues["airDistance_unknow"] = 1;
+		featureValues["groundDistance_unknow"] = 1;
+		int minDistance = 99999;
+		for (auto entry : baseAirDistanceInfo)
+		{
+			if (entry.second < minDistance)
+			{
+				minDistance = entry.second;
+			}
+		}
+		featureValues["mapMinAirDistance_"] = getNormalizedValue(features["mapMinAirDistance_"], minDistance);
+		minDistance = 99999;
+		for (auto entry : baseGroundDistanceInfo)
+		{
+			if (entry.second < minDistance)
+			{
+				minDistance = entry.second;
+			}
+		}
+		featureValues["mapMinGroundDistance_"] = getNormalizedValue(features["mapMinGroundDistance_"], minDistance);
+	}
 
+	featureValues["mapBaseCount_"] = getNormalizedValue(features["mapBaseCount_"], int(BWTA::getBaseLocations().size()));
 	int ourLarvaCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Larva);
-	featureValue["state_general_feature"][getCategory(featureNames["state_general_feature"]["ourLarvaCount_"], ourLarvaCount, "ourLarvaCount_")] = 1;
-
+	featureValues["ourLarvaCount_"] = getNormalizedValue(features["ourLarvaCount_"], ourLarvaCount);
 	std::string openingName = "openingStrategy_" + std::to_string(int(currentopeningStrategy));
-	featureValue["state_general_feature"][openingName] = 1;
+	featureValues[openingName] = 1;
 
 
 	//state tech
-	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourBuildings = InformationManager::Instance().getOurAllBuildingUnit();
-	if (ourBuildings.find(BWAPI::UnitTypes::Zerg_Hive) != ourBuildings.end() && ourBuildings[BWAPI::UnitTypes::Zerg_Hive].size() > 0)
-		featureValue["state_tech_feature"]["ourTechLevel_hive"] = 1;
-	else if (ourBuildings.find(BWAPI::UnitTypes::Zerg_Lair) != ourBuildings.end() && ourBuildings[BWAPI::UnitTypes::Zerg_Lair].size() > 0)
-		featureValue["state_tech_feature"]["ourTechLevel_lair"] = 1;
-	else
-		featureValue["state_tech_feature"]["ourTechLevel_hatchery"] = 1;
-
 	if (BWAPI::Broodwar->self()->hasResearched(BWAPI::TechTypes::Lurker_Aspect))
-		featureValue["state_tech_feature"]["ourKeyUpgrade_hasLurker"] = 1;
-	if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Pneumatized_Carapace) > 0)
-		featureValue["state_tech_feature"]["ourKeyUpgrade_hasLordSpeed"] = 1;
-	if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Ventral_Sacs) > 0)
-		featureValue["state_tech_feature"]["ourKeyUpgrade_hasLordLoad"] = 1;
+		featureValues["ourKeyUpgrade_LurkerResearch"] = 1;
 	if (BWAPI::Broodwar->self()->getUpgradeLevel(BWAPI::UpgradeTypes::Adrenal_Glands) > 0)
-		featureValue["state_tech_feature"]["ourKeyUpgrade_zerglingsAttackSpeed"] = 1;
+		featureValues["ourKeyUpgrade_ZerglingsAttackSpeed"] = 1;
 
 
-	//staet buildings
-	if (ourBuildings.find(BWAPI::UnitTypes::Zerg_Spire) != ourBuildings.end() && ourBuildings[BWAPI::UnitTypes::Zerg_Spire].size() > 0)
-		featureValue["state_building_feature"]["ourKeyBuilding_hasSpire"] = 1;
-		/*
-	if (ourBuildings.find(BWAPI::UnitTypes::Zerg_Hydralisk_Den) != ourBuildings.end() && ourBuildings[BWAPI::UnitTypes::Zerg_Hydralisk_Den].size() > 0)
-		featureValue["state_building_feature"]["ourKeyBuilding_hasHydraDen"] = 1;
-	if (ourBuildings.find(BWAPI::UnitTypes::Zerg_Spawning_Pool) != ourBuildings.end() && ourBuildings[BWAPI::UnitTypes::Zerg_Spawning_Pool].size() > 0)
-		featureValue["state_building_feature"]["ourKeyBuilding_hasPool"] = 1;
-	if (InformationManager::Instance().GetOurBaseUnit() != NULL)
-		featureValue["state_building_feature"]["ourKeyBuilding_hasStartBase"] = 1;
-		*/
+	//state buildings
+	//self buildings
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourBuildings = InformationManager::Instance().getOurAllBuildingUnit();
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Spire) > 0)
+		featureValues["ourKeyBuilding_Spire"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Greater_Spire) > 0)
+	{
+		featureValues["ourKeyBuilding_GreaterSpire"] = 1;
+		featureValues["ourKeyBuilding_Spire"] = 1;
+	}
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) > 0)
+		featureValues["ourKeyBuilding_HydraliskDen"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Queens_Nest) > 0)
+		featureValues["ourKeyBuilding_QueenNest"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Spawning_Pool) > 0)
+		featureValues["ourKeyBuilding_SpawningPool"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Ultralisk_Cavern) > 0)
+		featureValues["ourKeyBuilding_UltraliskCavern"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) > 0)
+		featureValues["ourKeyBuilding_Lair"] = 1;
+	if (BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0)
+	{
+		featureValues["ourKeyBuilding_Hive"] = 1;
+		featureValues["ourKeyBuilding_Lair"] = 1;
+	}
+	int hatcheryCount = BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hatchery) +
+		BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Lair) +
+		BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hive);
+	featureValues["ourHatchery_"] = getNormalizedValue(features["ourHatchery_"], hatcheryCount);
+	featureValues["ourExtractor_"] = getNormalizedValue(features["ourExtractor_"], BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Extractor));
 
+	//enemy buildings
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& enemyBuildings = InformationManager::Instance().getEnemyAllBuildingUnit();
 	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
 	{
+		int enemyHatcheryCount = 0;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Spire) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Spire].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasZ_Spire"] = 1;
+			featureValues["enemyKeyBuilding_hasZ_Spire"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Hive) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Hive].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasZ_hive"] = 1;
+		{
+			featureValues["enemyKeyBuilding_hasZ_hive"] = 1;
+			featureValues["enemyKeyBuilding_hasZ_Lair"] = 1;
+			enemyHatcheryCount += enemyBuildings[BWAPI::UnitTypes::Zerg_Hive].size();
+		}
+		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Lair) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Lair].size() > 0)
+		{
+			featureValues["enemyKeyBuilding_hasZ_Lair"] = 1;
+			enemyHatcheryCount += enemyBuildings[BWAPI::UnitTypes::Zerg_Lair].size();
+		}
+		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Hydralisk_Den) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Hydralisk_Den].size() > 0)
+			featureValues["enemyKeyBuilding_hasZ_HydraliskDen"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Queens_Nest) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Queens_Nest].size() > 0)
+			featureValues["enemyKeyBuilding_hasZ_QueenNest"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Spawning_Pool) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Zerg_Spawning_Pool].size() > 0)
+			featureValues["enemyKeyBuilding_hasZ_SpawningPool"] = 1;
+
+		if (enemyBuildings.find(BWAPI::UnitTypes::Zerg_Hatchery) != enemyBuildings.end())
+			enemyHatcheryCount += enemyBuildings[BWAPI::UnitTypes::Zerg_Hatchery].size();
+		featureValues["enemyZ_Hatchery_"] = getNormalizedValue(features["enemyZ_Hatchery_"], enemyHatcheryCount);
+
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran)
 	{
 		if (enemyBuildings.find(BWAPI::UnitTypes::Terran_Starport) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Terran_Starport].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasT_starPort"] = 1;
+			featureValues["enemyKeyBuilding_hasT_starPort"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Terran_Engineering_Bay) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Terran_Engineering_Bay].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasT_engineerBay"] = 1;
+			featureValues["enemyKeyBuilding_hasT_engineerBay"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Terran_Academy) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Terran_Academy].size() > 0)
+			featureValues["enemyKeyBuilding_hasT_Academy"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Terran_Armory) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Terran_Armory].size() > 0)
+			featureValues["enemyKeyBuilding_hasT_Armory"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Terran_Science_Facility) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Terran_Science_Facility].size() > 0)
+			featureValues["enemyKeyBuilding_hasT_scienceFacility"] = 1;
 
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Terran_Barracks) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Terran_Barracks].size() : 0;
-		if (featureCount > 0) featureValue["state_building_feature"][getCategory(featureNames["state_building_feature"]["enemyT_Barracks_"], featureCount, "enemyT_Barracks_")] = 1;
+		featureValues["enemyT_Barracks_"] = getNormalizedValue(features["enemyT_Barracks_"], featureCount);
+
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Terran_Factory) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Terran_Factory].size() : 0;
-		if (featureCount > 0) featureValue["state_building_feature"][getCategory(featureNames["state_building_feature"]["enemyT_Factory_"], featureCount, "enemyT_Factory_")] = 1;
+		featureValues["enemyT_Factory_"] = getNormalizedValue(features["enemyT_Factory_"], featureCount);
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
 	{
-		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Stargate) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Stargate].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasP_stargate"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Robotics_Facility) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Robotics_Facility].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasP_robotics_facility"] = 1;
+			featureValues["enemyKeyBuilding_hasP_robotics_facility"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Templar_Archives) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Templar_Archives].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasP_temple"] = 1;
+			featureValues["enemyKeyBuilding_hasP_temple"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Fleet_Beacon) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Fleet_Beacon].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasP_fleet_beacon"] = 1;
+			featureValues["enemyKeyBuilding_hasP_fleet_beacon"] = 1;
 		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Citadel_of_Adun) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Citadel_of_Adun].size() > 0)
-			featureValue["state_building_feature"]["enemyKeyBuilding_hasP_Citadel"] = 1;
+			featureValues["enemyKeyBuilding_hasP_Citadel"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Cybernetics_Core) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Cybernetics_Core].size() > 0)
+			featureValues["enemyKeyBuilding_hasP_cybernetics"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Forge) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Forge].size() > 0)
+			featureValues["enemyKeyBuilding_hasP_forge"] = 1;
+		if (enemyBuildings.find(BWAPI::UnitTypes::Protoss_Observatory) != enemyBuildings.end() && enemyBuildings[BWAPI::UnitTypes::Protoss_Observatory].size() > 0)
+			featureValues["enemyKeyBuilding_hasP_observatory"] = 1;
 
+		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Protoss_Stargate) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Protoss_Stargate].size() : 0;
+		featureValues["enemyP_Stargate_"] = getNormalizedValue(features["enemyP_Stargate_"], featureCount);
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Protoss_Gateway) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Protoss_Gateway].size() : 0;
-		if (featureCount > 0) featureValue["state_building_feature"][getCategory(featureNames["state_building_feature"]["enemyP_Gateway_"], featureCount, "enemyP_Gateway_")] = 1;
+		featureValues["enemyP_Gateway_"] = getNormalizedValue(features["enemyP_Gateway_"], featureCount);
 	}
 
 	//state economy
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourUnits = InformationManager::Instance().getOurAllBattleUnit();
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& enemyUnits = InformationManager::Instance().getEnemyAllBattleUnit();
-	std::string mineralFeature = getCategory(featureNames["state_economy_feature"]["ourMineral_"], BWAPI::Broodwar->self()->minerals(), "ourMineral_");
-	std::string gasFeature = getCategory(featureNames["state_economy_feature"]["ourGas_"], BWAPI::Broodwar->self()->gas(), "ourGas_");
 
-	featureValue["state_economy_feature"][getCategory(featureNames["state_economy_feature"]["ourMineral_"], BWAPI::Broodwar->self()->minerals(), "ourMineral_")] = 1;
-	featureValue["state_economy_feature"][getCategory(featureNames["state_economy_feature"]["ourGas_"], BWAPI::Broodwar->self()->gas(), "ourGas_")] = 1;
-	featureValue["state_economy_feature"][getCategory(featureNames["state_economy_feature"]["ourWorkers_"], ourUnits[BWAPI::UnitTypes::Zerg_Drone].size(), "ourWorkers_")] = 1;
+	featureValues["ourMineral_"] = getNormalizedValue(features["ourMineral_"], BWAPI::Broodwar->self()->minerals());
+	featureValues["ourGas_"] = getNormalizedValue(features["ourGas_"], BWAPI::Broodwar->self()->gas());
+	featureValues["ourWorkers_"] = getNormalizedValue(features["ourWorkers_"], ourUnits[BWAPI::UnitTypes::Zerg_Drone].size());
 	int enemyWorkerCount = enemyUnits.find(enemyWork) != enemyUnits.end() ? enemyUnits[enemyWork].size() : 0;
-	if (enemyWorkerCount > 0) featureValue["state_economy_feature"][getCategory(featureNames["state_economy_feature"]["enemyWorkers_"], enemyWorkerCount, "enemyWorkers_")] = 1;
+	featureValues["enemyWorkers_"] = getNormalizedValue(features["enemyWorkers_"], enemyWorkerCount);
+
 	std::set<BWAPI::Unit>& ourBases = InformationManager::Instance().getOurAllBaseUnit();
 	std::set<BWAPI::Unit>& enemyBases = InformationManager::Instance().getEnemyAllBaseUnit();
 
-	std::string ourExpandName = getCategory(featureNames["state_economy_feature"]["ourExpandBase_"], ourBases.size() - 1, "ourExpandBase_");
-	std::string enemyExpandName = getCategory(featureNames["state_economy_feature"]["enemyExpandBase_"], enemyBases.size() - 1, "enemyExpandBase_");
-	featureValue["state_economy_feature"][ourExpandName] = 1;
-	featureValue["state_economy_feature"][enemyExpandName] = 1;
+	featureValues["ourExpandBase_"] = getNormalizedValue(features["ourExpandBase_"], ourBases.size() - 1);
+	featureValues["enemyExpandBase_"] = getNormalizedValue(features["enemyExpandBase_"], enemyBases.size() - 1);
 
+	int mineralWorkerCount = WorkerManager::Instance().getNumMineralWorkers();
+	featureValues["ourMineralWorkers_"] = getNormalizedValue(features["ourMineralWorkers_"], mineralWorkerCount);
+
+	std::set<BWTA::Region *>& ourRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	int mineralLeft = 0;
+	for (auto m : BWAPI::Broodwar->getMinerals())
+	{
+		if (ourRegions.find(BWTA::getRegion(m->getPosition())) != ourRegions.end())
+		{
+			mineralLeft++;
+		}
+	}
+	featureValues["ourMineralLeft_"] = getNormalizedValue(features["ourMineralLeft_"], mineralLeft);
 
 	//state battle
-	std::map<BWAPI::UnitType, int> morphUnits;
+	morphUnits.clear();
 	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
 	{
-		if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg)
+		if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker_Egg)
 		{
 			if (unit->getBuildType() != BWAPI::UnitTypes::Zerg_Overlord && unit->getBuildType() != BWAPI::UnitTypes::Zerg_Drone)
 			{
-				if (morphUnits.find(unit->getBuildType()) != morphUnits.end())
+				if (morphUnits.find(unit->getBuildType()) == morphUnits.end())
 				{
-					morphUnits[unit->getBuildType()] += 1;
+					morphUnits[unit->getBuildType()] = 0;
+				}
+
+				if (unit->getBuildType() == BWAPI::UnitTypes::Zerg_Zergling || unit->getBuildType() == BWAPI::UnitTypes::Zerg_Scourge)
+				{
+					morphUnits[unit->getBuildType()] += 2;
 				}
 				else
 				{
-					morphUnits[unit->getBuildType()] = 1;
+					morphUnits[unit->getBuildType()] += 1;
 				}
 			}
 		}
 	}
 
 	// state_our_army
-	featureCount = ourBuildings.find(BWAPI::UnitTypes::Zerg_Sunken_Colony) != ourBuildings.end() ? ourBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() : 0;
-	if (featureCount > 0) featureValue["state_our_army"][getCategory(featureNames["state_our_army"]["ourSunken_"], featureCount, "ourSunken_")] = 1;
-	featureCount = ourBuildings.find(BWAPI::UnitTypes::Zerg_Spore_Colony) != ourBuildings.end() ? ourBuildings[BWAPI::UnitTypes::Zerg_Spore_Colony].size() : 0;
-	if (featureCount > 0) featureValue["state_our_army"][getCategory(featureNames["state_our_army"]["ourSpore_"], featureCount, "ourSpore_")] = 1;
+	featureCount = BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony);
+	featureValues["ourSunken_"] = getNormalizedValue(features["ourSunken_"], featureCount);
+	featureCount = BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Spore_Colony);
+	featureValues["ourSpore_"] = getNormalizedValue(features["ourSpore_"], featureCount);
 
-	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Zergling) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Zergling].size() : 0) + (morphUnits.find(BWAPI::UnitTypes::Zerg_Zergling) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Zergling] * 2 : 0);
-	if (featureCount > 0) featureValue["state_our_army"][getCategory(featureNames["state_our_army"]["ourZergling_"], featureCount, "ourZergling_")] = 1;
-	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Mutalisk) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Mutalisk].size() : 0) + (morphUnits.find(BWAPI::UnitTypes::Zerg_Mutalisk) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Mutalisk] : 0);
-	if (featureCount > 0) featureValue["state_our_army"][getCategory(featureNames["state_our_army"]["ourMutalisk_"], featureCount, "ourMutalisk_")] = 1;
-	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Hydralisk) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Hydralisk].size() : 0) + (morphUnits.find(BWAPI::UnitTypes::Zerg_Hydralisk) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Hydralisk] : 0);
-	if (featureCount > 0) featureValue["state_our_army"][getCategory(featureNames["state_our_army"]["ourHydra_"], featureCount, "ourHydra_")] = 1;
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Zergling) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Zergling].size() : 0);
+	featureValues["ourZergling_"] = getNormalizedValue(features["ourZergling_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Zergling) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Zergling] * 2 : 0;
+	featureValues["ourEggZergling_"] = getNormalizedValue(features["ourEggZergling_"], featureCount);
+
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Mutalisk) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Mutalisk].size() : 0);
+	featureValues["ourMutalisk_"] = getNormalizedValue(features["ourMutalisk_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Mutalisk) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Mutalisk] : 0;
+	featureValues["ourEggMutalisk_"] = getNormalizedValue(features["ourEggMutalisk_"], featureCount);
+
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Hydralisk) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Hydralisk].size() : 0);
+	featureValues["ourHydra_"] = getNormalizedValue(features["ourHydra_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Hydralisk) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Hydralisk] : 0;
+	featureValues["ourEggHydra_"] = getNormalizedValue(features["ourEggHydra_"], featureCount);
+
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Lurker) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Lurker].size() : 0);
+	featureValues["ourLurker_"] = getNormalizedValue(features["ourLurker_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Lurker) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Lurker] : 0;
+	featureValues["ourEggLurker_"] = getNormalizedValue(features["ourEggLurker_"], featureCount);
+
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Scourge) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Scourge].size() : 0);
+	featureValues["ourScourage_"] = getNormalizedValue(features["ourScourage_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Scourge) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Scourge] : 0;
+	featureValues["ourEggScourage_"] = getNormalizedValue(features["ourEggScourage_"], featureCount);
+
+	featureCount = (ourUnits.find(BWAPI::UnitTypes::Zerg_Ultralisk) != ourUnits.end() ? ourUnits[BWAPI::UnitTypes::Zerg_Ultralisk].size() : 0);
+	featureValues["ourUltralisk_"] = getNormalizedValue(features["ourUltralisk_"], featureCount);
+	featureCount = morphUnits.find(BWAPI::UnitTypes::Zerg_Ultralisk) != morphUnits.end() ? morphUnits[BWAPI::UnitTypes::Zerg_Ultralisk] : 0;
+	featureValues["ourEggUltralisk_"] = getNormalizedValue(features["ourEggUltralisk_"], featureCount);
 
 	// state_enemy
 	if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Zerg)
 	{
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Zerg_Sunken_Colony) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Zerg_Sunken_Colony].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Sunken_"], featureCount, "enemyZ_Sunken_")] = 1;
+		featureValues["enemyZ_Sunken_"] = getNormalizedValue(features["enemyZ_Sunken_"], featureCount);
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Zerg_Spore_Colony) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Zerg_Spore_Colony].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Spore_"], featureCount, "enemyZ_Spore_")] = 1;
+		featureValues["enemyZ_Spore_"] = getNormalizedValue(features["enemyZ_Spore_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Zergling) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Zergling].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Zergling_"], featureCount, "enemyZ_Zergling_")] = 1;
+		featureValues["enemyZ_Zergling_"] = getNormalizedValue(features["enemyZ_Zergling_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Mutalisk) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Mutalisk].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Mutalisk_"], featureCount, "enemyZ_Mutalisk_")] = 1;
+		featureValues["enemyZ_Mutalisk_"] = getNormalizedValue(features["enemyZ_Mutalisk_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Hydralisk) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Hydralisk].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Hydra_"], featureCount, "enemyZ_Hydra_")] = 1;
+		featureValues["enemyZ_Hydra_"] = getNormalizedValue(features["enemyZ_Hydra_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Lurker) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Lurker].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyZ_Lurker_"], featureCount, "enemyZ_Lurker_")] = 1;
+		featureValues["enemyZ_Lurker_"] = getNormalizedValue(features["enemyZ_Lurker_"], featureCount);
+		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Scourge) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Scourge].size() : 0;
+		featureValues["enemyZ_Scourage"] = getNormalizedValue(features["enemyZ_Scourage"], featureCount);
+		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Ultralisk) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Ultralisk].size() : 0;
+		featureValues["enemyZ_Ultralisk"] = getNormalizedValue(features["enemyZ_Ultralisk"], featureCount);
+		featureCount = enemyUnits.find(BWAPI::UnitTypes::Zerg_Defiler) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Zerg_Defiler].size() : 0;
+		featureValues["enemyZ_Defiler"] = getNormalizedValue(features["enemyZ_Defiler"], featureCount);
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Terran)
 	{
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Terran_Missile_Turret) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Terran_Missile_Turret].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_missile_"], featureCount, "enemyT_missile_")] = 1;
+		featureValues["enemyT_missile_"] = getNormalizedValue(features["enemyT_missile_"], featureCount);
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Terran_Bunker) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Terran_Bunker].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Bunker_"], featureCount, "enemyT_Bunker_")] = 1;
+		featureValues["enemyT_Bunker_"] = getNormalizedValue(features["enemyT_Bunker_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Goliath) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Goliath].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Goliath_"], featureCount, "enemyT_Goliath_")] = 1;
+		featureValues["enemyT_Goliath_"] = getNormalizedValue(features["enemyT_Goliath_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Marine) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Marine].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Marine_"], featureCount, "enemyT_Marine_")] = 1;
+		featureValues["enemyT_Marine_"] = getNormalizedValue(features["enemyT_Marine_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Vulture) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Vulture].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Vulture_"], featureCount, "enemyT_Vulture_")] = 1;
+		featureValues["enemyT_Vulture_"] = getNormalizedValue(features["enemyT_Vulture_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Dropship) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Dropship].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Dropship_"], featureCount, "enemyT_Dropship_")] = 1;
+		featureValues["enemyT_Dropship_"] = getNormalizedValue(features["enemyT_Dropship_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Valkyrie) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Valkyrie].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Valkyrie_"], featureCount, "enemyT_Valkyrie_")] = 1;
+		featureValues["enemyT_Valkyrie_"] = getNormalizedValue(features["enemyT_Valkyrie_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Science_Vessel) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Science_Vessel].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Science_"], featureCount, "enemyT_Science_")] = 1;
+		featureValues["enemyT_Science_"] = getNormalizedValue(features["enemyT_Science_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Siege_Tank_Tank_Mode) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Siege_Tank_Tank_Mode].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Tank_"], featureCount, "enemyT_Tank_")] = 1;
+		featureValues["enemyT_Tank_"] = getNormalizedValue(features["enemyT_Tank_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Firebat) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Firebat].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Firebat_"], featureCount, "enemyT_Firebat_")] = 1;
+		featureValues["enemyT_Firebat_"] = getNormalizedValue(features["enemyT_Firebat_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Terran_Medic) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Terran_Medic].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyT_Terran_Medic_"], featureCount, "enemyT_Terran_Medic_")] = 1;
+		featureValues["enemyT_Terran_Medic_"] = getNormalizedValue(features["enemyT_Terran_Medic_"], featureCount);
 
 	}
 	else if (BWAPI::Broodwar->enemy()->getRace() == BWAPI::Races::Protoss)
 	{
 		featureCount = enemyBuildings.find(BWAPI::UnitTypes::Protoss_Photon_Cannon) != enemyBuildings.end() ? enemyBuildings[BWAPI::UnitTypes::Protoss_Photon_Cannon].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_cannon_"], featureCount, "enemyP_cannon_")] = 1;
+		featureValues["enemyP_cannon_"] = getNormalizedValue(features["enemyP_cannon_"], featureCount);
 
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_Zealot) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_Zealot].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_Zealot_"], featureCount, "enemyP_Zealot_")] = 1;
+		featureValues["enemyP_Zealot_"] = getNormalizedValue(features["enemyP_Zealot_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_Dragoon) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_Dragoon].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_Dragon_"], featureCount, "enemyP_Dragon_")] = 1;
+		featureValues["enemyP_Dragon_"] = getNormalizedValue(features["enemyP_Dragon_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_High_Templar) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_High_Templar].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_High_temple_"], featureCount, "enemyP_High_temple_")] = 1;
+		featureValues["enemyP_High_temple_"] = getNormalizedValue(features["enemyP_High_temple_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_Carrier) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_Carrier].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_Carrier_"], featureCount, "enemyP_Carrier_")] = 1;
+		featureValues["enemyP_Carrier_"] = getNormalizedValue(features["enemyP_Carrier_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_Corsair) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_Corsair].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_Corsair_"], featureCount, "enemyP_Corsair_")] = 1;
+		featureValues["enemyP_Corsair_"] = getNormalizedValue(features["enemyP_Corsair_"], featureCount);
 		featureCount = enemyUnits.find(BWAPI::UnitTypes::Protoss_Shuttle) != enemyUnits.end() ? enemyUnits[BWAPI::UnitTypes::Protoss_Shuttle].size() : 0;
-		if (featureCount > 0) featureValue["state_battle_feature"][getCategory(featureNames["state_battle_feature"]["enemyP_Shuttle_"], featureCount, "enemyP_Shuttle_")] = 1;
+		featureValues["enemyP_Shuttle_"] = getNormalizedValue(features["enemyP_Shuttle_"], featureCount);
 	}
 
-
-	//state combine feature
-
-	for (auto enemyBattleFeature : featureValue["state_battle_feature"])
+	for (auto entry : buildingsUnderProcess)
 	{
-		for (auto ourBattleFeature : featureValue["state_our_army"])
+		if (entry.first != BWAPI::UnitTypes::Zerg_Sunken_Colony
+			&& entry.first != BWAPI::UnitTypes::Zerg_Spore_Colony)
 		{
-			std::string combineFeatureName = enemyBattleFeature.first + "*" + ourBattleFeature.first;
-			featureValue["state_raw_combine_feature"][combineFeatureName] = 1;
+			featureValues[buildingsName[entry.first]] = 1;
+		}
+	}
+	if (buildingsUnderProcess.find(BWAPI::UnitTypes::Zerg_Sunken_Colony) != buildingsUnderProcess.end())
+	{
+		featureValues["building_during_production_Defense_Sunken"] = getNormalizedValue(features["building_during_production_Defense_Sunken"], buildingsUnderProcess[BWAPI::UnitTypes::Zerg_Sunken_Colony].first);
+	}
+
+	//if (buildingsUnderProcess.find(BWAPI::UnitTypes::Zerg_Spore_Colony) != buildingsUnderProcess.end())
+	//{
+		//featureValues["building_during_production_Defense_Spore"] = getNormalizedValue(features["building_during_production_Defense_Spore"], buildingsUnderProcess[BWAPI::UnitTypes::Zerg_Spore_Colony].first);
+	//}
+
+	for (auto entry : techUnderProcess)
+	{
+		featureValues[techsName[entry.first]] = 1;
+	}
+	for (auto entry : upgradeUnderProcess)
+	{
+		featureValues[upgradesName[entry.first]] = 1;
+	}
+
+	if (TacticManager::Instance().isOneTacticRun(MutaliskHarassTac))
+	{
+		featureValues["execute_Attack_MutaliskHarassAttack"] = 1;
+	}
+	if (TacticManager::Instance().isOneTacticRun(HydraliskPushTactic))
+	{
+		featureValues["execute_Attack_AllInAttack"] = 1;
+	}
+}
+
+
+void StrategyManager::buildingFinish(BWAPI::UnitType u)
+{
+	if (buildingsUnderProcess.find(u) != buildingsUnderProcess.end())
+	{
+		buildingsUnderProcess[u].first = buildingsUnderProcess[u].first - 1;
+		if (buildingsUnderProcess[u].first == 0)
+		{
+			buildingsUnderProcess.erase(u);
+		}
+	}
+}
+
+bool StrategyManager::isGasRequireMeet(int price)
+{
+	if (price > 0
+		&& WorkerManager::Instance().getNumGasWorkers() == 0
+		&& BWAPI::Broodwar->self()->gas() < price)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+bool StrategyManager::isMineRequireMeet(int price)
+{
+	if (price > 0
+		&& WorkerManager::Instance().getNumMineralWorkers() == 0
+		&& BWAPI::Broodwar->self()->minerals() < price)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+
+
+
+MetaType StrategyManager::getTargetUnit(BWAPI::UnitType exploreUnit = BWAPI::UnitTypes::None)
+{
+	//if (true)
+	//{
+		//exploreUnit = BWAPI::UnitTypes::Zerg_Hydralisk;
+	//}
+
+	featureValues.clear();
+	//get current state features
+	calCurrentStateFeature();
+
+	vector<double> nnInput(NNInputAction.size());
+	for (size_t i = 0; i < NNInputAction.size(); i++)
+	{
+		if (featureValues.find(NNInputAction[i]) != featureValues.end())
+		{
+			nnInput[i] = featureValues[NNInputAction[i]];
+			featureValues.erase(NNInputAction[i]);
+		}
+		else
+		{
+			nnInput[i] = -1;
 		}
 	}
 
-	std::string economyCombine = mineralFeature + "*" + gasFeature;
-	featureValue["state_raw_combine_feature"][economyCombine] = 1;
-
-	std::string mapRaceCombine = mapName + "*" + enemyRaceName;
-	featureValue["state_raw_combine_feature"][mapRaceCombine] = 1;
-
-	std::string expandBaseCombine = ourExpandName + "*" + enemyExpandName + "*" + mapName;
-	featureValue["state_raw_combine_feature"][expandBaseCombine] = 1;
+	if (featureValues.size() != 0)
+	{
+		BWAPI::Broodwar->printf("feature error!!!");
+	}
 
 	/*
-
-	for (auto enemyBattleFeature : featureValue["state_battle_feature"])
+	//softmax output is raw data, not the probability
+	vector<double> nnOutput = policyModel.feedForward(nnInput);
+	double softmaxTotal = 0;
+	for (auto s : nnOutput)
 	{
-		std::string combineFeatureName = enemyBattleFeature.first + "*" + timeName;
-		featureValue["state_raw_combine_feature"][combineFeatureName] = 1;
+		softmaxTotal += s;
 	}
-
-	for (auto ourBattleFeature : featureValue["state_our_army"])
+	for (auto& s : nnOutput)
 	{
-		std::string combineFeatureName = ourBattleFeature.first + "*" + timeName;
-		featureValue["state_raw_combine_feature"][combineFeatureName] = 1;
+		s = s / softmaxTotal;
 	}
+	*/
+	vector<double> nnOutput = QValueModel.feedForward(nnInput);
 
-	std::string expandBaseCombine = ourExpandName + "*" + enemyExpandName;
-	featureValue["state_raw_combine_feature"][expandBaseCombine] = 1;
-
-	std::string openingRaceCombine = openingName + "*" + enemyRaceName;
-	featureValue["state_raw_combine_feature"][openingRaceCombine] = 1;*/
-
-}
-
-
-
-double StrategyManager::calActionFeature(std::string curAction, std::map<std::string, std::map<std::string, int>>& features)
-{
-	for (auto categoryStateFeature : features)
+	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& ourBuildings = InformationManager::Instance().getOurAllBuildingUnit();
+	map<string, double> filteredActionResult;
+	for (size_t i = 0; i < nnOutput.size(); i++)
 	{
-		if (categoryStateFeature.first == "state_raw_combine_feature" || categoryStateFeature.first == "state_building_feature")
+		if (NNOutputAction[i].find("Building_") != std::string::npos)
 		{
-			for (auto stateFeature : categoryStateFeature.second)
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].unitType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].unitType.mineralPrice()))
 			{
-				std::string combineFeatureName = stateFeature.first + "*" + curAction;
-				features["action_battle_combine_state_battle_feature"][combineFeatureName] = 1;
+				continue;
 			}
-		}
-	}
 
-	if (features["state_tech_feature"].find("ourKeyUpgrade_zerglingsAttackSpeed") != features["state_tech_feature"].end())
-	{
-		std::string combineFeatureName = std::string("ourKeyUpgrade_zerglingsAttackSpeed") + "*" + curAction;
-		features["action_battle_combine_state_battle_feature"][combineFeatureName] = 1;
-	}
-
-	double curQValue = 0;
-	for (auto categoryFeature : features)
-	{
-		for (auto curfeature : categoryFeature.second)
-		{
-			int curfeatureValue = curfeature.second;
-			if (parameterValue.find(categoryFeature.first) != parameterValue.end() && parameterValue[categoryFeature.first].find(curfeature.first) != parameterValue[categoryFeature.first].end())
+			//tech buildings just need one instance
+			if (BWAPI::Broodwar->self()->allUnitCount(highLevelActions[NNOutputAction[i]].unitType) > 0
+				|| buildingsUnderProcess.find(highLevelActions[NNOutputAction[i]].unitType) != buildingsUnderProcess.end())
 			{
-				double curParameterValue = parameterValue[categoryFeature.first][curfeature.first];
-				curQValue += curParameterValue * curfeatureValue;
+				continue;
 			}
-		}
-	}
-	return curQValue;
-
-}
-
-
-//backup value is full return
-
-string	StrategyManager::strategyChange(int reward)
-{
-	//non-terminal state
-	if (reward == 0)
-	{
-		featureValue.clear();
-
-		//get current state features
-		calCurrentStateFeature();
-
-		double maxQValue = -9999999;
-		string maxAction = "";
-		std::map<std::string, std::map<std::string, int>> maxFeatureValue;
-		//select next action
-		for (auto action : stateActions)
-		{
-			std::map<std::string, std::map<std::string, int>> actionFeatureValue = featureValue;
-			double curQValue = calActionFeature(action, actionFeatureValue);
-
-			if (curQValue > maxQValue)
+			if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0
+				&& highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Lair)
 			{
-				maxQValue = curQValue;
-				maxAction = action;
-				maxFeatureValue = actionFeatureValue;
+				continue;
+			}
+			if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Greater_Spire) > 0
+				&& highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Spire)
+			{
+				continue;
+			}
+			if (highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Hive)
+			{
+				BWAPI::Unit baseUnit = InformationManager::Instance().GetOurBaseUnit();
+				if (baseUnit != NULL && (baseUnit->isResearching() || baseUnit->isUpgrading()))
+				{
+					continue;
+				}
+			}
+
+			std::map<BWAPI::UnitType, int> requireUnits = highLevelActions[NNOutputAction[i]].unitType.requiredUnits();
+			bool isValid = true;
+			for (auto u : requireUnits)
+			{
+				if (u.first.isBuilding() && BWAPI::Broodwar->self()->completedUnitCount(u.first) == 0)
+				{
+					isValid = false;
+					break;
+				}
+			}
+
+			if (isValid)
+			{
+				filteredActionResult[NNOutputAction[i]] = nnOutput[i];
 			}
 		}
 
-		//explore rate start at 70%, grow 5 percent with 50 match, and grow 1 percent with 100 match.
-		
-		int exploreRate = 0;
-		if (curMode == Develop)
+		else if (NNOutputAction[i].find("Defense_") != std::string::npos)
 		{
-			if (playMatchCount > 25 * 8)
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].unitType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].unitType.mineralPrice()))
 			{
-				exploreRate = 90;
+				continue;
+			}
+
+			int underBuildCount = 0;
+			if (buildingsUnderProcess.find(highLevelActions[NNOutputAction[i]].unitType) != buildingsUnderProcess.end())
+			{
+				underBuildCount = buildingsUnderProcess[highLevelActions[NNOutputAction[i]].unitType].first;
+			}
+			if (BWAPI::Broodwar->self()->allUnitCount(highLevelActions[NNOutputAction[i]].unitType) + underBuildCount >= 10
+				|| BWAPI::Broodwar->getFrameCount() < nextDefenseBuildTime)
+				continue;
+
+			if (NNOutputAction[i] == "Defense_Sunken" && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Spawning_Pool) > 0)
+			{
+				filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+			}
+			else if (NNOutputAction[i] == "Defense_Spore" && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Evolution_Chamber) > 0)
+			{
+				filteredActionResult[NNOutputAction[i]] = nnOutput[i];
 			}
 			else
 			{
-				exploreRate = 50 + int((float(playMatchCount) / 25) * 5);
+				continue;
 			}
 		}
-		else
-		{
-			exploreRate = 90;
-		}
 
-		//do more explore at training stage to get a reasonable score for all Q(s,a)
-		if (std::rand() % 100 > exploreRate)
+		else if (NNOutputAction[i].find("Unit_") != std::string::npos)
 		{
-			std::vector<std::string> actionlist;
-			for (auto item : stateActions)
+			//if (exploreUnit != BWAPI::UnitTypes::None && highLevelActions[NNOutputAction[i]].unitType != exploreUnit)
+			//{
+				//continue;
+			//}
+			int morphCount = 0;
+			if (morphUnits.find(BWAPI::UnitTypes::Zerg_Scourge) != morphUnits.end())
 			{
-				if (item != maxAction)
+				morphCount = morphUnits[BWAPI::UnitTypes::Zerg_Scourge];
+			}
+			if (highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Scourge
+				&& BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Scourge) + morphCount > 12)
+			{
+				continue;
+			}
+
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].unitType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].unitType.mineralPrice()))
+			{
+				continue;
+			}
+
+			if (BWAPI::Broodwar->self()->gas() < highLevelActions[NNOutputAction[i]].unitType.gasPrice() * 3
+				&& BWAPI::Broodwar->self()->minerals() > 5000 )
+			{
+				continue;
+			}
+
+			int supplyRequired = highLevelActions[NNOutputAction[i]].unitType.supplyRequired();
+			if (highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Zergling 
+				|| highLevelActions[NNOutputAction[i]].unitType == BWAPI::UnitTypes::Zerg_Scourge)
+			{
+				supplyRequired = supplyRequired * 2;
+			}
+			if (BWAPI::Broodwar->self()->supplyUsed() + supplyRequired > 200 * 2)
+			{
+				continue;
+			}
+
+			std::map<BWAPI::UnitType, int> requireUnits = highLevelActions[NNOutputAction[i]].unitType.requiredUnits();
+			bool isValid = true;
+			for (auto u : requireUnits)
+			{
+				if (u.first != BWAPI::UnitTypes::Zerg_Larva && BWAPI::Broodwar->self()->completedUnitCount(u.first) == 0)
 				{
-					actionlist.push_back(item);
+					if (u.first == BWAPI::UnitTypes::Zerg_Spire && BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Greater_Spire) > 0)
+					{
+						continue;
+					}
+					if (u.first == BWAPI::UnitTypes::Zerg_Lair && BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0)
+					{
+						continue;
+					}
+					isValid = false;
+					break;
 				}
 			}
-			int randomIndex = std::rand() % actionlist.size();
 
-			//set current features to this explore action feature
-			calActionFeature(actionlist[randomIndex], featureValue);
+			if (isValid)
+			{
+				if (NNOutputAction[i] == "Unit_Lurker")
+				{
+					if (BWAPI::Broodwar->self()->hasResearched(BWAPI::TechTypes::Lurker_Aspect))
+					{
+						filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+					}
+				}
+				else
+				{
+					filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+				}
+			}
+		}
 
-			maxAction = actionlist[randomIndex];
+		//only the lurker tech
+		else if (NNOutputAction[i].find("Tech_") != std::string::npos)
+		{
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].techType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].techType.mineralPrice()))
+			{
+				continue;
+			}
+
+			if (techUnderProcess.find(highLevelActions[NNOutputAction[i]].techType) != techUnderProcess.end())
+			{
+				continue;
+			}
+
+			if (BWAPI::Broodwar->self()->hasResearched(BWAPI::TechTypes::Lurker_Aspect) == false &&
+				BWAPI::Broodwar->self()->isResearching(BWAPI::TechTypes::Lurker_Aspect) == false &&
+				BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk_Den) > 0 &&
+				(BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Lair) > 0 || 
+				BWAPI::Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Zerg_Hive) > 0))
+			{
+				BWAPI::Unit hydraliskDen = *ourBuildings[BWAPI::UnitTypes::Zerg_Hydralisk_Den].begin();
+				if (!hydraliskDen->isResearching() && !hydraliskDen->isUpgrading())
+				{
+					filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+				}
+			}
+		}
+
+		else if (NNOutputAction[i].find("Upgrade_") != std::string::npos)
+		{
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].upgradeType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].upgradeType.mineralPrice()))
+			{
+				continue;
+			}
+
+			if (upgradeUnderProcess.find(highLevelActions[NNOutputAction[i]].upgradeType) != upgradeUnderProcess.end())
+			{
+				continue;
+			}
+			BWAPI::UnitType researchingUnit = highLevelActions[NNOutputAction[i]].upgradeType.whatUpgrades();
+			BWAPI::UnitType requireUnit = highLevelActions[NNOutputAction[i]].upgradeType.whatsRequired();
+
+			if (BWAPI::Broodwar->self()->getUpgradeLevel(highLevelActions[NNOutputAction[i]].upgradeType) == 0
+				&& BWAPI::Broodwar->self()->isUpgrading(highLevelActions[NNOutputAction[i]].upgradeType) == false)
+			{
+				if (highLevelActions[NNOutputAction[i]].upgradeType == BWAPI::UpgradeTypes::Pneumatized_Carapace)
+				{
+					BWAPI::Unit baseUnit = InformationManager::Instance().GetOurBaseUnit();
+					if (baseUnit == NULL)
+					{
+						continue;
+					}
+
+					//unit maybe researching other upgrades
+					if (baseUnit->isCompleted() && (baseUnit->getType() == BWAPI::UnitTypes::Zerg_Lair || baseUnit->getType() == BWAPI::UnitTypes::Zerg_Hive)
+						&& !baseUnit->isUpgrading() && !baseUnit->isResearching())
+					{
+						filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+					}
+				}
+				else
+				{
+					if (BWAPI::Broodwar->self()->completedUnitCount(researchingUnit) != 0)
+					{
+						BWAPI::Unit builder = *ourBuildings[researchingUnit].begin();
+						if (!builder->isResearching() && !builder->isUpgrading()
+							&& (requireUnit == BWAPI::UnitTypes::None || BWAPI::Broodwar->self()->completedUnitCount(requireUnit) != 0))
+						{
+							filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+						}
+					}
+				}
+			}
+		}
+
+		else if (NNOutputAction[i].find("Expand_") != std::string::npos)
+		{
+			if (!isGasRequireMeet(highLevelActions[NNOutputAction[i]].unitType.gasPrice()) ||
+				!isMineRequireMeet(highLevelActions[NNOutputAction[i]].unitType.mineralPrice()))
+			{
+				continue;
+			}
+
+			if (buildingsUnderProcess.find(highLevelActions[NNOutputAction[i]].unitType) != buildingsUnderProcess.end()
+				|| InformationManager::Instance().GetNextExpandLocation() == BWAPI::TilePositions::None)
+			{
+				continue;
+			}
+
+			filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+		}
+		
+		else if (NNOutputAction[i].find("Attack_") != std::string::npos)
+		{
+			std::map<BWAPI::UnitType, int> remain = AttackManager::Instance().reaminArmy();
+
+			if (NNOutputAction[i] == "Attack_MutaliskHarassAttack" && remain[BWAPI::UnitTypes::Zerg_Mutalisk] > 0
+				&& AttackManager::Instance().getNextAttackPosition(false) != BWAPI::Positions::None)
+			{
+				filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+			}
+			else if (NNOutputAction[i] == "Attack_AllInAttack" && AttackManager::Instance().getNextAttackPosition(true) != BWAPI::Positions::None)
+			{
+				int total = 0;
+				for (auto army : remain)
+				{
+					total += army.second;
+				}
+				if (total > 0)
+				{
+					filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+				}
+			}
+		}
+		else if (NNOutputAction[i].find("Wait_") != std::string::npos)
+		{
+			if (BWAPI::Broodwar->getFrameCount() > 24 * 60 * 15)
+			{
+				continue;
+			}
+
+			//only wait when some key building/tech is morphing
+			bool isUnderConstruct = false;
+			for (auto b : buildingsUnderProcess)
+			{
+				if (b.first != BWAPI::UnitTypes::Zerg_Sunken_Colony && b.first != BWAPI::UnitTypes::Zerg_Spore_Colony
+					&& b.first != BWAPI::UnitTypes::Zerg_Hatchery)
+				{
+					isUnderConstruct = true;
+					break;
+				}
+			}
+			if (BWAPI::Broodwar->self()->isResearching(BWAPI::TechTypes::Lurker_Aspect))
+			{
+				isUnderConstruct = true;
+			}
+
+			if (isUnderConstruct)
+			{
+				filteredActionResult[NNOutputAction[i]] = nnOutput[i];
+			}
+		}
+
+		else
+		{
+			BWAPI::Broodwar->printf("error type filter!!");
+		}
+	}
+
+	////no valid action available
+	if (filteredActionResult.size() == 0)
+	{
+		return MetaType();
+	}
+
+	/*
+	double filteredTotalProb = 0.0f;
+	for (auto f : filteredActionResult)
+	{
+		filteredTotalProb += f.second;
+	}
+
+	LARGE_INTEGER cpuTime;
+	QueryPerformanceCounter(&cpuTime);
+	unsigned int startTimeInMicroSec = cpuTime.QuadPart % 1000000;
+
+	std::srand(startTimeInMicroSec);
+	int randomNum = std::rand() % 100;
+	double accumulatedProb = 0.0;
+	string chosedAction;
+	double chosedActionProb;
+	for (auto f : filteredActionResult)
+	{
+		accumulatedProb += f.second / filteredTotalProb;
+		if (accumulatedProb * 100 > randomNum)
+		{
+			chosedAction = f.first;
+			chosedActionProb = f.second / filteredTotalProb;
+			break;
+		}
+	}
+	
+	vector<double> valueOutput = stateValueModel.feedForward(nnInput);
+
+	//save data for training
+	//schema: inputFeature, curStateValue, reward, curChosedActionIndex, curOutputChosen, fromStartIndex, nextStateInputFeature
+	if (previousChosenAction != chosedAction)
+	{
+	std::vector<std::string> dataVector;
+	std::stringstream dataString;
+	dataString.precision(15);
+	dataString << std::fixed;
+	for (auto in : nnInput)
+	{
+	dataString << in << ":";
+	}
+	dataVector.push_back(dataString.str());
+	dataVector.push_back(std::to_string(valueOutput[0]));
+	dataVector.push_back(std::to_string(tmpReward));
+	tmpReward = 0;
+	dataVector.push_back(std::to_string(actionsOutputIndexMapping[chosedAction]));
+	std::vector<int> filterOutput;
+	filterOutput.reserve(filteredActionResult.size());
+	for (auto f : filteredActionResult)
+	{
+	filterOutput.push_back(actionsOutputIndexMapping[f.first]);
+	}
+	dataString.str("");
+	dataString.clear();
+	for (auto f : filterOutput)
+	{
+	dataString << f << ":";
+	}
+	dataVector.push_back(dataString.str());
+	dataVector.push_back(std::to_string(trainingData.size()));
+	dataVector.push_back("");
+	trainingData.push_back(dataVector);
+
+	previousChosenAction = chosedAction;
+	}
+
+	*/
+
+	double maxValue = -999999;
+	string maxAction;
+	double secondValue = -99999;
+	string secondAction;
+	for (auto f : filteredActionResult)
+	{
+		if (f.second > secondValue)
+		{
+			secondAction = f.first;
+			secondValue = f.second;
+			if (secondValue > maxValue)
+			{
+				string tmpAction = maxAction;
+				double tmpValue = maxValue;
+				maxValue = secondValue;
+				maxAction = secondAction;
+				secondAction = tmpAction;
+				secondValue = tmpValue;
+			}
+		}
+	}
+	double diff = (maxValue - secondValue) / maxValue;
+
+	int exploreRate = 0;
+	exploreRate = 100 - int(((float(playMatchCount) / 50)) * 90)  < 10 ? 10 : 100 - int(((float(playMatchCount) / 50)) * 90);
+
+	string chosedAction;
+	std::random_device rand_dev;
+	std::mt19937 generator(rand_dev());
+	std::uniform_int_distribution<int>  distr(0, 100);
+	int randomNum = distr(generator);
+	bool isExplore = false;
+	//do explore
+	if (randomNum < exploreRate)
+	{
+		isExplore = true;
+		std::uniform_int_distribution<int>  dist2(0, filteredActionResult.size() - 1);
+		int randomActionNum = dist2(generator);
+		int count = 0;
+		for (auto f : filteredActionResult)
+		{
+			if (count == randomActionNum)
+			{
+				chosedAction = f.first;
+				break;
+			}
+			count++;
+		}
+
+	}
+	else
+	{
+		chosedAction = maxAction;
+	}
+	
+	BWAPI::Broodwar->printf("current:%s,max:%s,reward:%.2f,\n diff:%f, time: %d", chosedAction.c_str(), maxAction.c_str(), tmpReward, diff, BWAPI::Broodwar->getFrameCount());
+
+
+	if (filteredActionResult.size() > 1)
+	{
+		//save data for training
+		//schema: curState, action, reward, nextState, currentStateValidActions, nextStateValidActions
+		if (trainingData.size() > 0)
+		{
+			trainingData.back()[2] = std::to_string(tmpReward);
+		}
+		tmpReward = 0;
+		std::vector<std::string> dataVector;
+		std::stringstream dataString;
+		dataString.precision(15);
+		dataString << std::fixed;
+		for (auto in : nnInput)
+		{
+			dataString << in << ":";
+		}
+		dataVector.push_back(dataString.str());
+		dataVector.push_back(std::to_string(actionsOutputIndexMapping[chosedAction]));
+		dataVector.push_back("0");
+		dataVector.push_back("");
+		std::vector<int> filterOutput;
+		filterOutput.reserve(filteredActionResult.size());
+		for (auto f : filteredActionResult)
+		{
+			filterOutput.push_back(actionsOutputIndexMapping[f.first]);
+		}
+		dataString.str("");
+		dataString.clear();
+		for (auto f : filterOutput)
+		{
+			dataString << f << ":";
+		}
+		dataVector.push_back(dataString.str());
+		dataVector.push_back("");
+		trainingData.push_back(dataVector);
+	}
+	
+
+	if (chosedAction.find("Attack_") != std::string::npos)
+	{
+		if (chosedAction == "Attack_MutaliskHarassAttack")
+		{
+			AttackManager::Instance().issueAttackCommand(MutaliskHarassTac);
 		}
 		else
 		{
-			featureValue = maxFeatureValue;
+			AttackManager::Instance().issueAttackCommand(HydraliskPushTactic);
 		}
 
-		bool featureValid = true;
+		return MetaType();
+	}
+	else if (chosedAction.find("Expand_") != std::string::npos)
+	{
+		BWAPI::TilePosition nextBase = InformationManager::Instance().GetNextExpandLocation();
+		if (nextBase == BWAPI::TilePositions::None)
+			nextBase = BWAPI::Broodwar->self()->getStartLocation();
 
-		for (std::map<std::string, std::map<std::string, int>>::iterator it = featureValue.begin(); it != featureValue.end();)
+		buildingsUnderProcess[highLevelActions[chosedAction].unitType].first = 1;
+		InformationManager::Instance().addFakeOccupiedBase(nextBase);
+		return MetaType(BWAPI::UnitTypes::Zerg_Hatchery, nextBase);
+	}
+	else if (chosedAction.find("Building_") != std::string::npos)
+	{
+		buildingsUnderProcess[highLevelActions[chosedAction].unitType].first = 1;
+		return highLevelActions[chosedAction];
+	}
+	else if (chosedAction.find("Defense_") != std::string::npos)
+	{
+		if (buildingsUnderProcess.find(highLevelActions[chosedAction].unitType) == buildingsUnderProcess.end())
+			buildingsUnderProcess[highLevelActions[chosedAction].unitType].first = 0;
+		buildingsUnderProcess[highLevelActions[chosedAction].unitType].first += 1;
+		nextDefenseBuildTime = BWAPI::Broodwar->getFrameCount() + 24 * 3;
+
+		ProductionManager::Instance().triggerBuilding(highLevelActions[chosedAction].unitType, InformationManager::Instance().getSunkenBuildingPosition(), 1);
+		return MetaType();
+	}
+	else if (chosedAction.find("Tech_") != std::string::npos)
+	{
+		ProductionManager::Instance().triggerTech(highLevelActions[chosedAction].techType);
+		techUnderProcess[highLevelActions[chosedAction].techType] = chosedAction;
+		return MetaType();
+	}
+	else if (chosedAction.find("Upgrade_") != std::string::npos)
+	{
+		ProductionManager::Instance().triggerUpgrade(highLevelActions[chosedAction].upgradeType);
+		upgradeUnderProcess[highLevelActions[chosedAction].upgradeType] = chosedAction;
+		return MetaType();
+	}
+	else if (chosedAction.find("Wait_") != std::string::npos)
+	{
+		return MetaType();
+	}
+	else
+	{
+		return highLevelActions[chosedAction];
+	}
+}
+
+
+sampleParsedInfo StrategyManager::sampleParse(std::vector<std::string>& sample)
+{
+	sampleParsedInfo result;
+
+	std::stringstream ss;
+	ss.str("");
+	ss.clear();
+	ss << sample[0];
+	string item;
+	while (getline(ss, item, ':'))
+	{
+		if (item == "")
+			continue;
+		result.modelInputs.push_back(std::stod(item));
+	}
+	result.actualChosen = std::stoi(sample[1]);
+
+	double targetQValue = 0;
+	//terminal state-- next state value is empty
+	if (sample[3] == "")
+	{
+		targetQValue = std::stod(sample[2]);
+	}
+	else
+	{
+		ss.str("");
+		ss.clear();
+		ss << sample[3];
+		std::vector<double> nextItemList;
+		while (getline(ss, item, ':'))
 		{
-			if (featureNames.find(it->first) == featureNames.end())
+			if (item == "")
+				continue;
+			nextItemList.push_back(std::stod(item));
+		}
+		//double Q learning
+		vector<double> allActionValues = QValueModel.feedForward(nextItemList);
+		vector<double> targetAllActionValues = targetQValueModel.feedForward(nextItemList);
+
+		ss.str("");
+		ss.clear();
+		ss << sample[5];
+		std::set<int> outList;
+		while (getline(ss, item, ':'))
+		{
+			if (item == "")
+				continue;
+			outList.insert(std::stoi(item));
+		}
+		double maxValue = -999999;
+		int	maxActionIndex = 0;
+		for (size_t i = 0; i < allActionValues.size(); i++)
+		{
+			if (outList.find(i) != outList.end() && allActionValues[i] > maxValue)
 			{
-				featureValue.erase(it++);
-				featureValid = false;
+				maxValue = allActionValues[i];
+				maxActionIndex = i;
+			}
+		}
+
+		double targetMaxValue = targetAllActionValues[maxActionIndex];
+		targetQValue = std::stod(sample[2]) + std::pow(discountRate, tdStep) * targetMaxValue;
+	}
+	result.targetQValue = targetQValue;
+
+	return result;
+}
+
+
+double StrategyManager::getSamplePriority(std::vector<std::string>& sample)
+{
+	sampleParsedInfo result = sampleParse(sample);
+	vector<double> allActionValues = QValueModel.feedForward(result.modelInputs);
+	double TDError = allActionValues[result.actualChosen] - result.targetQValue;
+	return  std::pow(std::abs(TDError) + 0.01, 0.6);
+}
+
+
+void StrategyManager::trainModels(int reward)
+{
+	if (trainingData.size() > 0)
+	{
+		std::map<std::string, int> actionExecutionCount;
+		trainingData[trainingData.size() - 1][2] = std::to_string(reward + tmpReward);
+		for (int i = 0; i < int(trainingData.size()) - 1; i++)
+		{
+			int nStepIndex = i + tdStep;
+			//schema: curState, action, reward, nextState, currentStateValidActions, nextStateValidActions
+			if (nStepIndex <= int(trainingData.size()) - 1)
+			{
+				trainingData[i][3] = trainingData[nStepIndex][0];
+				trainingData[i][5] = trainingData[nStepIndex][4];
+			}
+
+			double totalReward = 0;
+			int step = 0;
+			if (nStepIndex > int(trainingData.size()) - 1)
+			{
+				nStepIndex = int(trainingData.size());
+			}
+			for (int j = i; j < nStepIndex; j++)
+			{
+				totalReward += std::pow(discountRate, step) * std::stod(trainingData[j][2]);
+				step++;
+			}
+			trainingData[i][2] = std::to_string(totalReward);
+		}
+
+		for (auto sample : trainingData)
+		{
+			double priority = getSamplePriority(sample);
+			replayData.add(priority, sample);
+		}
+	}
+
+	if (replayData.getData().size() == 0){
+		return;
+	}
+
+	int trainingRound = 200;//trainingData.size() < 200 ? 200 : trainingData.size();
+	int miniBatch = 8;
+	vector<double> loss;
+	
+	for (int round = 0; round < trainingRound; round++)
+	{
+		double curError = iterationTrain(miniBatch);
+		loss.push_back(curError);
+	}
+
+	/*
+	fstream historyFile;
+	string filePath = "./bwapi-data/write/loss_data";
+	historyFile.open(filePath.c_str(), ios::app);
+	double total = 0;
+	historyFile << "round:" << playMatchCount <<endl;
+	for (size_t i = 0; i < loss.size();)
+	{
+		total += loss[i];
+		i++;
+		if (i % 10 == 0 && i != 0)
+		{
+			historyFile << total / 10;
+			historyFile << endl;
+			total = 0;
+		}
+	}
+	historyFile << endl;
+	historyFile.close();
+	*/
+
+	//tesetSetPerformance();
+	experienceDataSave();
+	string enemyName = BWAPI::Broodwar->enemy()->getName();
+	QValueModel.serialize(enemyName + "_QValue", writeResourceFolder);
+
+	int targetUpdateFrequence = 10;
+	if (playMatchCount >= 50)
+	{
+		targetUpdateFrequence = 20;
+	}
+	else if (playMatchCount >= 100)
+	{
+		targetUpdateFrequence = 40;
+	}
+	//target network delay update
+	if (playMatchCount % targetUpdateFrequence == 0)
+	{
+		targetQValueModel.copy(QValueModel);
+	}
+	targetQValueModel.serialize(enemyName + "_targetQValueModel", writeResourceFolder);
+
+
+	/*
+		std::map<std::string, int> actionExecutionCount;
+		for (int i = 0; i < int(trainingData.size()); i++)
+		{
+			double dReward = std::pow(discountRate, trainingData.size() - 1 - i) * reward;
+			trainingData[i][2] = std::to_string(dReward);
+
+			//std::size_t pos = NNOutputAction[std::stoi(trainingData[i][3])].find("_");
+			//std::string categoty = NNOutputAction[std::stoi(trainingData[i][3])].substr(0, pos);
+			std::string categoty = NNOutputAction[std::stoi(trainingData[i][3])];
+			if (actionExecutionCount.find(categoty) == actionExecutionCount.end())
+			{
+				actionExecutionCount[categoty] = 0;
+			}
+			actionExecutionCount[categoty] += 1;
+		}
+
+		int maxCount = 0;
+		for (auto e : actionExecutionCount)
+		{
+			if (e.second > maxCount)
+			{
+				maxCount = e.second;
+			}
+		}
+
+		std::vector<std::vector<std::string>> tmpAdd;
+		for (int i = 0; i < int(trainingData.size()); i++)
+		{
+			std::string categoty = NNOutputAction[std::stoi(trainingData[i][3])];
+			if (categoty.find("Upgrade_") == std::string::npos)
+			{
+				int addCopyRatio = (int(maxCount / actionExecutionCount[categoty]) - 1);
+				tmpAdd.insert(tmpAdd.end(), addCopyRatio, trainingData[i]);
+			}
+		}
+
+		trainingData.insert(trainingData.end(), tmpAdd.begin(), tmpAdd.end());
+		if (trainingData.size() != 0)
+		{
+			experienceData.push_back(trainingData);
+		}
+	}
+	
+	if (experienceData.size() == 0)
+		return;
+
+	vector<int> loseMatchIndex;
+	vector<int> winMatchIndex;
+	for (size_t i = 0; i < experienceData.size(); i++)
+	{
+		if (std::stod(experienceData[i][0][2]) < 0)
+		{
+			loseMatchIndex.push_back(i);
+		}
+		else
+		{
+			winMatchIndex.push_back(i);
+		}
+	}
+
+	std::srand((unsigned int)std::time(0));
+	int GDRound = 100;
+	int eachGdRoundSampleMatch = 10;
+	if (experienceData.size() < 10)
+	{
+		GDRound = experienceData.size();
+		eachGdRoundSampleMatch = 3;
+	}
+
+	for (int i = 0; i < GDRound; i++)
+	{
+		std::vector<int> sampleMatches;
+		for (int sample = 0; sample < eachGdRoundSampleMatch; sample++)
+		{
+			//int matchIndex = std::rand() % experienceData.size();
+			int matchIndex = 0;
+			if (loseMatchIndex.size() > 0 && winMatchIndex.size() > 0)
+			{
+				if (sample % 3 == 0)
+				{
+					matchIndex = loseMatchIndex[std::rand() % loseMatchIndex.size()];
+				}
+				else
+				{
+					matchIndex = winMatchIndex[std::rand() % winMatchIndex.size()];
+				}
+			}
+			else
+			{
+				matchIndex = std::rand() % experienceData.size();
+			}
+
+			sampleMatches.push_back(matchIndex);
+		}
+
+		double curError = iterationTrain(sampleMatches);
+	}
+
+	//repeat training instance with largest error
+	//iterationTrain(maxMatchIndex);
+
+	experienceDataSave();
+	policyModel.serialize("policy");
+	stateValueModel.serialize("stateValue");
+	stateValueTargetModel.serialize("stateValueTarget");
+	*/
+}
+
+
+double StrategyManager::iterationTrain(int miniBatch)
+{
+	map<int, vector<string>> sampleDatas = replayData.sample(miniBatch);
+
+	vector<vector<double>> modelInputs;
+	vector<int> actualChosen;
+	vector<double> targetValues;
+	for (auto instance : sampleDatas)
+	{
+		double priority = getSamplePriority(instance.second);
+		replayData.updatePriority(instance.first, priority);
+
+		//importance sampling weight
+
+		sampleParsedInfo parseData = sampleParse(instance.second);
+		modelInputs.push_back(parseData.modelInputs);
+		actualChosen.push_back(parseData.actualChosen);
+		targetValues.push_back(parseData.targetQValue);
+	}
+
+	double curError = 0;
+	curError = QValueModel.train(modelInputs, MSE, targetValues, actualChosen);
+	return curError;
+
+
+	/*
+	vector<vector<double>> modelInputs;
+	vector<double> expectValue;
+	vector<int> actualChosen;
+	vector<vector<int>> outputChosen;
+	vector<double> qValues;
+	vector<int> indexValue;
+	std::stringstream ss;
+	for (int i = 0; i < miniBatch; i++)
+	{
+		int index = std::rand() % experienceData.size();
+		ss.str("");
+		ss.clear();
+		ss << experienceData[index][0];
+		std::vector<double> itemList;
+		string item;
+		while (getline(ss, item, ':'))
+		{
+			if (item == "")
+				continue;
+			itemList.push_back(std::stod(item));
+		}
+		modelInputs.push_back(itemList);
+		ss.str("");
+		ss.clear();
+		ss << experienceData[index][4];
+		std::vector<int> outList;
+		while (getline(ss, item, ':'))
+		{
+			if (item == "")
+				continue;
+			outList.push_back(std::stoi(item));
+		}
+		outputChosen.push_back(outList);
+		//expectValue.push_back(std::stod(experienceData[matchIndex][index][2]));
+		actualChosen.push_back(std::stoi(experienceData[index][3]));
+		indexValue.push_back(std::stoi(experienceData[index][5]));
+
+		double qValue = 0;
+		double targetQValue = 0;
+		//terminal state
+		if (experienceData[index][6] == "")
+		{
+			qValue = targetQValue = std::stod(experienceData[index][2]);
+		}
+		else
+		{
+			ss.str("");
+			ss.clear();
+			ss << experienceData[index][6];
+			std::vector<double> nextItemList;
+			while (getline(ss, item, ':'))
+			{
+				if (item == "")
+					continue;
+				nextItemList.push_back(std::stod(item));
+			}
+			qValue = std::stod(experienceData[index][2]) + std::pow(discountRate, tdStep) * stateValueModel.feedForward(nextItemList)[0];
+			targetQValue = std::stod(experienceData[index][2]) + std::pow(discountRate, tdStep) * stateValueTargetModel.feedForward(nextItemList)[0];
+		}
+
+		double baseline = stateValueModel.feedForward(itemList)[0];
+		//reinforce with baseline
+		qValues.push_back(qValue - baseline);
+		expectValue.push_back(targetQValue);
+	}
+
+	double curError = policyModel.train(modelInputs, POLICY_GRADIENT, vector<double>(), actualChosen, 
+		outputChosen, qValues, indexValue, miniBatch);
+
+	stateValueModel.train(modelInputs, MSE, expectValue);
+
+	stateValueTargetModel.targetNetworkUpdate(stateValueModel);
+
+	return curError;
+	*/
+}
+
+
+void StrategyManager::tesetSetPerformance()
+{
+	vector<double> maxQValues;
+	vector<vector<double>> modelInputs;
+	vector<int> actualChosen;
+	vector<vector<int>> outputChosen;
+	vector<double> targetValues;
+	std::stringstream ss;
+	for (size_t index = 0; index < testSetData.size(); index++)
+	{
+		string item;
+		ss.str("");
+		ss.clear();
+		ss << testSetData[index][0];
+		std::vector<double> nextItemList;
+		while (getline(ss, item, ':'))
+		{
+			if (item == "")
+				continue;
+			nextItemList.push_back(std::stod(item));
+		}
+		vector<double> allActionValues = QValueModel.feedForward(nextItemList);
+
+		ss.str("");
+		ss.clear();
+		ss << testSetData[index][4];
+		std::set<int> outList;
+		while (getline(ss, item, ':'))
+		{
+			if (item == "")
+				continue;
+			outList.insert(std::stoi(item));
+		}
+		double maxValue = -999999;
+		for (size_t i = 0; i < allActionValues.size(); i++)
+		{
+			if (outList.find(i) != outList.end() && allActionValues[i] > maxValue)
+			{
+				maxValue = allActionValues[i];
+			}
+		}
+		maxQValues.push_back(maxValue);
+	}
+
+	double sumValue = 0;
+	for (auto m : maxQValues)
+	{
+		sumValue += m;
+	}
+	testSetAvgQValue = sumValue / maxQValues.size();
+}
+
+
+void StrategyManager::update()
+{
+	if (BWAPI::Broodwar->getFrameCount() % 25  == 0)
+	{
+		for (std::map<BWAPI::TechType, std::string>::iterator it = techUnderProcess.begin(); it != techUnderProcess.end();)
+		{
+			if (BWAPI::Broodwar->self()->hasResearched(it->first))
+			{
+				it = techUnderProcess.erase(it);
 			}
 			else
 			{
 				it++;
 			}
 		}
-		if (featureValid == false)
-		{
-			fstream lossFile;
-			string lossfilePath = "./bwapi-data/write/debug_file_featurevalue";
-			lossFile.open(lossfilePath.c_str(), ios::app);
-			lossFile << "1" << endl;
-			lossFile.close();
-			//return maxAction;
-		}
 
-		// save current to episode data
-		// Q(st-1) | action | '' | reward
-		// reward is gathered at the end of episode
-		std::vector<std::string> dataVector;
-		std::stringstream dataString;
-		for (auto categoryField : featureValue)
+		for (std::map<BWAPI::UpgradeType, std::string>::iterator it = upgradeUnderProcess.begin(); it != upgradeUnderProcess.end();)
 		{
-			for (auto field : categoryField.second)
+			if (BWAPI::Broodwar->self()->getUpgradeLevel(it->first) > 0)
 			{
-				if (field.second == 1)
-				{
-					dataString << categoryField.first << ":" << field.first << ":" << field.second << " ";
-				}
-			}
-		}
-		dataVector.push_back(dataString.str());
-		dataVector.push_back(maxAction);
-
-		dataString.str("");
-		dataVector.push_back(dataString.str());
-		dataVector.push_back("");
-		curEpisodeData.push_back(dataVector);
-
-		curEpisodeData[curEpisodeData.size() - 1][2] = std::to_string(BWAPI::Broodwar->getFrameCount() / (24 * 60));
-
-		/*
-		if (curEpisodeData.size() > 1)
-		{
-			int curTime = BWAPI::Broodwar->getFrameCount();
-			int actionCostTime = curTime - curActionTime;
-			curActionTime = curTime;
-			double curReward = -1 * float(actionCostTime) / (24 * 60);
-
-			curEpisodeData[curEpisodeData.size() - 2][3] = std::to_string(curReward);
-		}
-		else
-		{
-			curActionTime = BWAPI::Broodwar->getFrameCount();
-		}*/
-
-		//debug
-		//save current predict Q(s,a) to check the model's training status
-		if (curMode == Develop)
-		{
-			fstream actionFile;
-			std::string filePath = "./bwapi-data/write/action_data";
-			actionFile.open(filePath.c_str(), ios::app);
-			double Qvalue = 0;
-			for (auto categoryFeature : featureValue)
-			{
-				for (auto curfeature : categoryFeature.second)
-				{
-					if (curfeature.second == 1)
-					{
-						int curfeatureValue = curfeature.second;
-						if (parameterValue.find(categoryFeature.first) != parameterValue.end() && parameterValue[categoryFeature.first].find(curfeature.first) != parameterValue[categoryFeature.first].end())
-						{
-							double curParameterValue = parameterValue[categoryFeature.first][curfeature.first];
-							Qvalue += curParameterValue * curfeatureValue;
-						}
-					}
-				}
-			}
-			actionFile << Qvalue << endl;
-			actionFile.close();
-		}
-
-
-		return maxAction;
-	}
-	else
-	{
-		if (curEpisodeData.size() <= 1)
-		{
-			return "";
-		}
-		curEpisodeData.erase(curEpisodeData.end() - 1);
-		
-		int endMinut = BWAPI::Broodwar->getFrameCount() / (24 * 60);
-		//calculate the discount reward for each action
-		/*
-		float cumulativeReward = 0;
-		for (int i = int(curEpisodeData.size()) - 1; i >= 0; i--)
-		{
-			//if (i != int(curEpisodeData.size()) - 1)
-				//cumulativeReward += std::stof(curEpisodeData[i][3]);
-			//double dReward = reward + cumulativeReward;
-			int deltaMinutes = endMinut - std::stol(curEpisodeData[i][2]);
-			double dReward = int(std::pow(0.95, deltaMinutes) * reward * 100) / 100.0;
-			curEpisodeData[i][3] = std::to_string(dReward);
-		}*/
-
-		for (int i = 0; i < int(curEpisodeData.size()); i++)
-		{
-			double dReward = int(std::pow(discountRate, curEpisodeData.size() - 1 - i) * reward * 100000) / 100000.0;
-			curEpisodeData[i][3] = std::to_string(dReward);
-		}
-
-		/*
-		if (curEpisodeData.size() > 50)
-		{
-			
-			int eraseTime = curEpisodeData.size() - 50;
-			while (eraseTime > 0)
-			{
-				int randomIndex = std::rand() % curEpisodeData.size();
-				curEpisodeData.erase(curEpisodeData.begin() + randomIndex);
-				eraseTime--;
-			}
-			//curEpisodeData.erase(curEpisodeData.begin(), curEpisodeData.end() -= 30);
-		}*/
-
-		experienceData.insert(experienceData.end(), curEpisodeData.begin(), curEpisodeData.end());
-
-		//SGD
-		//minibatchsize = 10, doing multi times
-		int sgdTime = experienceData.size() < 500 ? 1 : (curEpisodeData.size() > 30 ? 30 : curEpisodeData.size());
-		for (int i = 0; i < sgdTime; i++)
-		{
-			std::map<std::string, std::map<std::string, double>> parameterGradient;
-			double loss = 0;
-			int miniBatchSize = 5;
-			if (experienceData.size() < 50)
-			{
-				miniBatchSize = 1;//experienceData.size();
-			}
-			for (int i = 0; i < miniBatchSize; i++)
-			{
-				int randomIndex = std::rand() % experienceData.size();
-				vector<std::string> randomData = experienceData[randomIndex];
-				std::map<std::string, std::map<std::string, int>> predictData;
-				double delta = 0;
-				if (randomData[3] != "0")
-				{
-					delta = calQValue(randomData[0], predictData) - std::stof(randomData[3]);
-					loss += delta * delta;
-				}
-				else
-				{
-					std::map<std::string, std::map<std::string, int>> realData;
-					delta = calQValue(randomData[0], predictData) - calQValue(randomData[2], realData);
-					loss += delta * delta;
-				}
-
-				for (auto categoryFeature : predictData)
-				{
-					for (auto curfeature : categoryFeature.second)
-					{
-						if (parameterCumulativeGradient.find(categoryFeature.first) != parameterCumulativeGradient.end()
-							&& parameterCumulativeGradient[categoryFeature.first].find(curfeature.first) != parameterCumulativeGradient[categoryFeature.first].end())
-						{
-							parameterCumulativeGradient[categoryFeature.first][curfeature.first] += 1;//delta * delta;
-						}
-						else
-						{
-							parameterCumulativeGradient[categoryFeature.first][curfeature.first] = 1;//delta * delta;
-						}
-
-						if (parameterGradient.find(categoryFeature.first) != parameterGradient.end()
-							&& parameterGradient[categoryFeature.first].find(curfeature.first) == parameterGradient[categoryFeature.first].end())
-						{
-							parameterGradient[categoryFeature.first][curfeature.first] += delta;
-						}
-						else
-						{
-							parameterGradient[categoryFeature.first][curfeature.first] = delta;
-						}
-					}
-				}
-			}
-
-
-			bool featureValid = true;
-
-			for (std::map<std::string, std::map<std::string, double>> ::iterator it = parameterGradient.begin(); it != parameterGradient.end();)
-			{
-				if (featureNames.find(it->first) == featureNames.end())
-				{
-					parameterGradient.erase(it++);
-					featureValid = false;
-				}
-				else
-				{
-					it++;
-				}
-			}
-			if (featureValid == false)
-			{
-				fstream lossFile;
-				string lossfilePath = "./bwapi-data/write/debug_file_featureweight";
-				lossFile.open(lossfilePath.c_str(), ios::app);
-				lossFile << "1" << endl;
-				lossFile.close();
-				//return maxAction;
-			}
-
-			//Q-learning is a off-policy method, which means the predicted value is always the max Q(s,a)
-			//independent of the the chosen action Q(s,a)
-			if (curMode == Develop)
-			{
-				fstream lossFile;
-				string lossfilePath = "./bwapi-data/write/loss_file";
-				lossFile.open(lossfilePath.c_str(), ios::app);
-				lossFile << loss << endl;
-				lossFile.close();
-			}
-
-			//float learningRate = 0.001 * 1 / float(std::sqrt(playMatchCount));
-
-			for (auto categoryParameter : parameterGradient)
-			{
-				for (auto parameter : categoryParameter.second)
-				{
-					//per-coordinate adaptive learning rate
-					int featureGdCount = int(parameterCumulativeGradient[categoryParameter.first][parameter.first]);
-					double discountLearning = std::pow(4, int(featureGdCount / 500)) * featureGdCount;
-					double learningRate = 0.001 / std::sqrt(discountLearning);
-					
-					//weird bug...
-					if (isnan(learningRate))
-					{
-						fstream lossFile;
-						string lossfilePath = "./bwapi-data/write/debug_file";
-						lossFile.open(lossfilePath.c_str(), ios::app);
-						lossFile << parameter.first << ":" << featureGdCount << ":" << discountLearning << ":" << learningRate << endl;
-						lossFile.close();
-
-						//parameterCumulativeGradient[categoryParameter.first][parameter.first] += 1;
-						continue;
-					}
-					
-					if (parameterValue.find(categoryParameter.first) != parameterValue.end() && parameterValue[categoryParameter.first].find(parameter.first) != parameterValue[categoryParameter.first].end())
-					{
-						parameterValue[categoryParameter.first][parameter.first] -= learningRate * parameter.second;
-					}
-					else
-					{
-						//parameter is initialized to zero
-						parameterValue[categoryParameter.first][parameter.first] = 0 - learningRate * parameter.second;
-					}
-				}
-			}
-		}
-		
-		return "";
-	}
-}
-
-
-
-	
-
-
-	
-
-
-//backup value in one step
-/*
-string	StrategyManager::strategyChange(int reward)
-{
-	std::map<std::string, std::map<std::string, int>> previousStateFeature = featureValue;
-	featureValue.clear();
-
-	double maxQValue = -9999999;
-	string maxAction = "";
-	std::map<std::string, std::map<std::string, int>> maxFeatureValue;
-	//non-terminal state
-	if (reward == 0)
-	{
-		//get current state features
-		calCurrentStateFeature();
-
-		//select next action
-		for (auto action : stateActions)
-		{
-			std::map<std::string, std::map<std::string, int>> actionFeatureValue = featureValue;
-			double curQValue = calActionFeature(action, actionFeatureValue);
-			
-			if (curQValue > maxQValue)
-			{
-				maxQValue = curQValue;
-				maxAction = action;
-				maxFeatureValue = actionFeatureValue;
-			}
-		}
-
-		//explore rate start at 70%, grow 5 percent with 50 match, and grow 1 percent with 100 match.
-		int exploreRate = 0;
-		if (playMatchCount > 50 * 5)
-		{
-			if (playMatchCount > 50 * 5 + 100 * 4)
-			{
-				exploreRate = 99;
+				it = upgradeUnderProcess.erase(it);
 			}
 			else
 			{
-				exploreRate = 95 + (playMatchCount - 50 * 5) / 100;
+				it++;
 			}
 		}
-		else
-		{
-			exploreRate = 70 + int((float(playMatchCount) / 50) * 5);
-		}
 
-		//do more explore at training stage to get a reasonable score for all Q(s,a)
-		if (std::rand() % 100 > exploreRate)
+		for (std::map<BWAPI::UnitType, std::pair<int, int>>::iterator it = buildingsUnderProcess.begin(); it != buildingsUnderProcess.end();)
 		{
-			std::vector<std::string> actionlist;
-			for (auto item : stateActions)
+			it->second.second += 25;
+			if (it->first != BWAPI::UnitTypes::Zerg_Hatchery && it->second.second > 25 * 60 
+				&& BWAPI::Broodwar->self()->allUnitCount(it->first) == 0)
 			{
-				if (item != maxAction)
-				{
-					actionlist.push_back(item);
-				}
-			}
-			int randomIndex = std::rand() % actionlist.size();
-
-			//set current features to this explore action feature
-			calActionFeature(actionlist[randomIndex], featureValue);
-
-			maxAction = actionlist[randomIndex];
-		}
-		else
-		{
-			featureValue = maxFeatureValue;
-		}
-	}
-
-	//for first strategyChange
-	if (previousStateFeature.size() == 0)
-	{
-		previousAction = maxAction;
-		return maxAction;
-	}
-
-	// save current to experience data
-	std::vector<std::string> dataVector;
-	std::stringstream dataString;
-	for (auto categoryField : previousStateFeature)
-	{
-		for (auto field : categoryField.second)
-		{
-			if (field.second == 1)
-			{
-				dataString << categoryField.first << ":" << field.first << ":" << field.second << " ";
-			}
-		}
-	}
-	dataVector.push_back(dataString.str());
-	dataVector.push_back(previousAction);
-
-	dataString.str("");
-	for (auto categoryField : maxFeatureValue)
-	{
-		for (auto field : categoryField.second)
-		{
-			if (field.second == 1)
-			{
-				dataString << categoryField.first << ":" << field.first << ":" << field.second << " ";
-			}
-		}
-	}
-	dataVector.push_back(dataString.str());
-	dataVector.push_back(std::to_string(reward));
-	experienceData.push_back(dataVector);
-
-	previousAction = maxAction;
-	
-
-	//debug
-	//save current predict Q(s,a) to check the model's training status
-	fstream actionFile;
-	std::string filePath = "./bwapi-data/write/action_data";
-	actionFile.open(filePath.c_str(), ios::app);
-	double Qvalue = 0;
-	for (auto categoryFeature : featureValue)
-	{
-		for (auto curfeature : categoryFeature.second)
-		{
-			if (curfeature.second == 1)
-			{
-				int curfeatureValue = curfeature.second;
-				if (parameterValue.find(categoryFeature.first) != parameterValue.end() && parameterValue[categoryFeature.first].find(curfeature.first) != parameterValue[categoryFeature.first].end())
-				{
-					double curParameterValue = parameterValue[categoryFeature.first][curfeature.first];
-					Qvalue += curParameterValue * curfeatureValue;
-				}
-			}
-		}
-	}
-	actionFile << Qvalue << endl;
-	actionFile.close();
-
-
-
-	//SGD
-	//minibatch = 10
-	std::map<std::string, std::map<std::string, double>> parameterGradient;
-	double loss = 0;
-	int miniBatchSize = 10;
-	if (experienceData.size() < 10)
-	{
-		miniBatchSize = 1;
-	}
-	for (int i = 0; i < miniBatchSize; i++)
-	{
-		int randomIndex = std::rand() % experienceData.size();
-		vector<std::string> randomData = experienceData[randomIndex];
-		std::map<std::string, std::map<std::string, int>> predictData;
-		double delta = 0;
-		if (randomData[3] != "0")
-		{
-			delta = calQValue(randomData[0], predictData) - std::stoi(randomData[3]);
-			loss += delta * delta;
-		}
-		else
-		{
-			std::map<std::string, std::map<std::string, int>> realData;
-			delta = calQValue(randomData[0], predictData) - calQValue(randomData[2], realData);
-			loss += delta * delta;
-		}
-
-		for (auto categoryFeature : predictData)
-		{
-			for (auto curfeature : categoryFeature.second)
-			{
-				if (parameterGradient[categoryFeature.first].find(curfeature.first) == parameterGradient[categoryFeature.first].end())
-				{
-					parameterGradient[categoryFeature.first][curfeature.first] = delta;
-				}
-				else
-				{
-					parameterGradient[categoryFeature.first][curfeature.first] += delta;
-				}
-			}
-		}
-	}
-
-	//Q-learning is a off-policy method, which means the predicted value is always the max Q(s,a)
-	//independent of the the chosen action Q(s,a)
-	fstream lossFile;
-	string lossfilePath = "./bwapi-data/write/loss_file";
-	lossFile.open(lossfilePath.c_str(), ios::app);
-	lossFile << loss << endl;
-	lossFile.close();
-
-
-	for (auto categoryParameter : parameterGradient)
-	{
-		for (auto parameter : categoryParameter.second)
-		{
-			if (parameterValue.find(categoryParameter.first) != parameterValue.end() && parameterValue[categoryParameter.first].find(parameter.first) != parameterValue[categoryParameter.first].end())
-			{
-				parameterValue[categoryParameter.first][parameter.first] -= 0.001 * parameter.second;
+				it = buildingsUnderProcess.erase(it);
+				BWAPI::Broodwar->printf("buildingsUnderProcess building not build!!!!!!!");
 			}
 			else
 			{
-				//parameter is initialized to zero
-				parameterValue[categoryParameter.first][parameter.first] = 0 - 0.001 * parameter.second;
+				it++;
 			}
 		}
-	}
 
-	return maxAction;
-}*/
-
-
-double StrategyManager::calQValue(std::string stringData, std::map<std::string, std::map<std::string, int>>& stringValue)
-{
-	double QValue = 0;
-	std::stringstream sd(stringData);
-	std::string feature;
-	while (getline(sd, feature, ' '))
-	{
-		if (feature == "")
-			continue;
-		std::stringstream ss(feature);
-		std::vector<string> itemList;
-		string item;
-		while (getline(ss, item, ':'))
-		{
-			if (item != "")
-				itemList.push_back(item);
-		}
-
-		if (parameterValue.find(itemList[0]) != parameterValue.end() && parameterValue[itemList[0]].find(itemList[1]) != parameterValue[itemList[0]].end())
-		{
-			double curParameterValue = parameterValue[itemList[0]][itemList[1]];
-			QValue += curParameterValue;
-		}
-		stringValue[itemList[0]][itemList[1]] = 1;
-	}
-
-	return QValue;
-}
-
-
-void StrategyManager::update()
-{
-	/*
-	if (overlordUpgradeTrigger && BWAPI::Broodwar->getFrameCount() > 12000)
-	{
-		//overlord speed
-		ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Pneumatized_Carapace);
-		overlordUpgradeTrigger = false;
-	}
-
-	switch (currentStrategy)
-	{
-	case HydraPush:
-	{
-		ProductionManager::Instance().setExtractorBuildSpeed(0);
-		ProductionManager::Instance().setDroneProductionSpeed(250);
-
-		if (hydraUpgradeTrigger && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Hydralisk) >= 12)
-		{
-			hydraUpgradeTrigger = false;
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Missile_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Carapace);
-		}
-	}
-		break;
-	case MutaPush:
-	{
-		ProductionManager::Instance().setExtractorBuildSpeed(0);
-		ProductionManager::Instance().setDroneProductionSpeed(250);
-
-		if (mutaUpgradeTrigger && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk) >= 8)
-		{
-			mutaUpgradeTrigger = false;
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Carapace);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Attacks);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Carapace);
-			ProductionManager::Instance().triggerUpgrade(BWAPI::UpgradeTypes::Zerg_Flyer_Attacks);
-		}
 		
-		std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& enemyBattle = InformationManager::Instance().getEnemyAllBattleUnit();
-		int enemyAntiAirSupply = 0;
-		for (std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>::iterator it = enemyBattle.begin(); it != enemyBattle.end(); it++)
-		{
-			if (it->first.airWeapon() != BWAPI::WeaponTypes::None)
-			{
-				enemyAntiAirSupply += it->first.supplyRequired() * it->second.size();
-			}
-		}
-
-		// if lost too many mutalisk , and enemy still have many anti-air army, change to hydrisk
-		if (enemyAntiAirSupply >= 2 * 1.5 * 12 && BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Mutalisk) * 3 < enemyAntiAirSupply)
-		{
-			goalChange(HydraPush);
-		}
 
 	}
-		break;
-	case ZerglingPush:
-	{
-		int hatchCompleteCount = 0;
-		BOOST_FOREACH(BWAPI::Unit u, BWAPI::Broodwar->self()->getUnits())
-		{
-			if (u->getType() == BWAPI::UnitTypes::Zerg_Hatchery && u->isCompleted())
-			{
-				hatchCompleteCount++;
-			}
-			else if (u->getType() == BWAPI::UnitTypes::Zerg_Lair)
-			{
-				hatchCompleteCount++;
-			}
-			else
-				continue;
-		}
-		// slow the drone production speed when only one hatch
-		if (hatchCompleteCount == 1)
-		{
-			ProductionManager::Instance().setDroneProductionSpeed(750);
-		}
-		else
-		{
-			ProductionManager::Instance().setDroneProductionSpeed(250);
-		}
-
-		ProductionManager::Instance().setExtractorBuildSpeed(15);
-
-		if (BWAPI::Broodwar->self()->gas() >= 100)
-		{
-			goalChange(MutaPush);
-		}
-	}
-		break;
-	default:
-
-		break;
-	}*/
 }
 
 
@@ -1957,7 +2594,7 @@ std::vector<MetaType> StrategyManager::getOpeningBook()
 	// according to the game progress, return start/mid/end strategy
 	if (selfRace == BWAPI::Races::Zerg)
 	{	//12hatch opening 
-		//return getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 0 0 0 4 6 1 11 11 0 0 0 0 12 12 8 0 5 1 1 0 0 10 10 10 10 10 10 10 1 10 10 10 10 19");
+		//return getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 0 0 0 4 6 1 11 11 0 0 0 0 12 12 8 0 5 1 1 0 0 10 10 10 10 10 10 10 1 10 10 10 10");
 
 		//overPool opening
 		//return getMetaVector("0 0 0 0 0 1 3 0 0 0 2 4 4 4 0 5 0 0 0 6 0 0 0 0 0 0 8 5 0 0 0 1 1 0 0 0 10 10 10 10 10 10 10 1 10 10 10 10 10 19 20 19 20 19 20");
@@ -1965,17 +2602,17 @@ std::vector<MetaType> StrategyManager::getOpeningBook()
 		if (currentopeningStrategy == TwelveHatchMuta)
 		{
 			//12 hatch mutalisk
-			return getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 4 4 4");//getMetaVector("0 0 0 0 0 1 0 0 0 2 3 5 0 0 0 4 4 4 6");
+			return getMetaVector("0 0 0 0 0 5 0 2 3 0 1 4 4 4 5 0 0 0 0 6 0 1 0 0 0 0 8 5 0 0 0 1 1 0 0 0 10 10 10 10 10 10 10 1 10 10 10");
 		}
 		else if (currentopeningStrategy == NinePoolling)
 		{
 			//9 pool zergling
-			return getMetaVector("0 0 0 0 0 3 0 5 0 1 4 4 4");
+			return getMetaVector("0 0 0 0 0 3 0 5 0 1 4 4 4 0");
 		}
 		else if (currentopeningStrategy == TenHatchMuta)
 		{
 			// 10 hatch counter 2 gate zealot
-			return getMetaVector("0 0 0 0 0 5 0 2 3 0 1 4 4 4");
+			return getMetaVector("0 0 0 0 0 5 0 2 3 0 1 4 4 4 0 0");
 		}
 		else
 		{

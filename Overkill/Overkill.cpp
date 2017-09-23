@@ -12,14 +12,7 @@ void Overkill::readHistoryFile()
 	string enemyName = BWAPI::Broodwar->enemy()->getName();
 
 	string filePath;
-	if (curMode == Develop)
-	{
-		filePath = "./bwapi-data/write/";
-	}
-	else
-	{
-		filePath = "./bwapi-data/read/";
-	}
+	filePath = readResourceFolder;
 	filePath += enemyName;
 	
 	//for each enemy, create a file
@@ -32,7 +25,7 @@ void Overkill::readHistoryFile()
 		historyFile.close();
 
 		//default opening strategy
-		chooseOpeningStrategy = TwelveHatchMuta;//TenHatchMuta;//NinePoolling;
+		chooseOpeningStrategy = TenHatchMuta; //TwelveHatchMuta;//TenHatchMuta;//NinePoolling;
 		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
 
 		StrategyManager::Instance().setOpponentWinrate("-1");
@@ -122,8 +115,11 @@ void Overkill::readHistoryFile()
 		{
 			chooseOpeningStrategy = openingStrategy(openingId);
 		}
-		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
+		 
+		//for test
+		//chooseOpeningStrategy = TenHatchMuta;
 
+		StrategyManager::Instance().setOpeningStrategy(chooseOpeningStrategy);
 		historyFile.close();
 	}
 }
@@ -133,7 +129,7 @@ void Overkill::writeCurrentPlay(bool isWin)
 {
 	fstream historyFile;
 	std::string enemyName = BWAPI::Broodwar->enemy()->getName();
-	std::string filePath = "./bwapi-data/write/";
+	std::string filePath = writeResourceFolder;
 	filePath += enemyName;
 
 	//for each enemy, create a file
@@ -154,11 +150,12 @@ void Overkill::writeCurrentPlay(bool isWin)
 	{
 		//12 hatch is slower than 10 hatch, so it may definitely loss in this match
 		//add this simulated record to improved ucb learning speed.
-		if (chooseOpeningStrategy == TenHatchMuta)
+		if (chooseOpeningStrategy == TenHatchMuta || chooseOpeningStrategy == TwelveHatchMuta)
 		{
 			std::vector<string> simulatedPlay;
 			simulatedPlay.push_back(enemyName);
-			simulatedPlay.push_back(StrategyManager::Instance().getStrategyName(TwelveHatchMuta));
+			openingStrategy simulateOpening = chooseOpeningStrategy == TenHatchMuta ? TwelveHatchMuta : TenHatchMuta;
+			simulatedPlay.push_back(StrategyManager::Instance().getStrategyName(simulateOpening));
 			simulatedPlay.push_back("0");
 			historyInfo.push_back(simulatedPlay);
 		}
@@ -216,7 +213,7 @@ void Overkill::onEnd(bool isWinner)
 
 	bool win = false;
 
-	if (frameElapse >= 86000 && BWAPI::Broodwar->self()->supplyUsed() >= 150 * 2)
+	if (frameElapse >= 80000 && BWAPI::Broodwar->self()->supplyUsed() >= 180 * 2)
 	{
 		win = true;
 	}
@@ -226,14 +223,18 @@ void Overkill::onEnd(bool isWinner)
 	}
 
 	writeCurrentPlay(win);
-	int reward = win == true ? 100 : -100;
+	int reward = win == true ? 10 : -10;
 
 	//TimerManager::Instance().startTimer(TimerManager::strategy);
 	
+	/*
 	StrategyManager::Instance().strategyChange(reward);
 	StrategyManager::Instance().featureWeightSave();
 	StrategyManager::Instance().featureGradientSave();
 	StrategyManager::Instance().experienceDataSave();
+	*/
+	StrategyManager::Instance().trainModels(reward);
+
 
 	//TimerManager::Instance().stopTimer(TimerManager::strategy);
 
@@ -260,15 +261,17 @@ void Overkill::onEnd(bool isWinner)
 	double maxValue = TimerManager::Instance().getMaxFrameValue();
 	//save match result
 	
+	
 	fstream historyFile;
-	string filePath = "./bwapi-data/write/match_result";
+	string filePath = writeResourceFolder + "match_result_" + BWAPI::Broodwar->enemy()->getName();
 	historyFile.open(filePath.c_str(), ios::app);
 	historyFile << win << ":" << maxFrameCount << ":" << gamePlayLength << ":" << enemyRace << ":" << mapName << ":" << maxTimeItem << ":" << maxValue << endl;
 	historyFile.close();
+	
 
 	//save match count data
 	int matchCount = StrategyManager::Instance().getPlayeMatchCount();
-	filePath = "./bwapi-data/write/match_count";
+	filePath = writeResourceFolder + "match_count_" + BWAPI::Broodwar->enemy()->getName();
 	historyFile.open(filePath.c_str(), ios::out);
 	historyFile << (matchCount + 1) << endl;
 	historyFile.close();
@@ -282,10 +285,18 @@ void Overkill::onFrame()
 		return;
 
 
-	if (curMode == Develop && BWAPI::Broodwar->getFrameCount() >= 86400)
+	if (BWAPI::Broodwar->getFrameCount() >= 90000)
 	{
 		BWAPI::Broodwar->leaveGame();
 	}
+
+	/*
+	if (WorkerManager::Instance().getNumMineralWorkers() == 0 && BWAPI::Broodwar->self()->minerals() < 100 
+		&& BWAPI::Broodwar->self()->supplyUsed() < 100 * 2 && BWAPI::Broodwar->getFrameCount() >= (24 * 60 * 15))
+	{
+		BWAPI::Broodwar->leaveGame();
+	}
+	*/
 
 
 	drawStats();
@@ -347,12 +358,6 @@ void Overkill::onFrame()
 
 	TimerManager::Instance().displayTimers(490, 180);
 	
-	/*
-	if (show_paths)
-	{
-		BuildingManager::Instance().addBuildingTask(BWAPI::UnitTypes::Zerg_Spawning_Pool, BWAPI::Broodwar->self()->getStartLocation());
-		show_paths = false;
-	}*/
 }
 
 void Overkill::onSendText(std::string text)
@@ -440,7 +445,8 @@ void Overkill::onUnitEvade(BWAPI::Unit unit)
 
 void Overkill::onUnitShow(BWAPI::Unit unit)
 {
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
+	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva
+		|| unit->getType() == BWAPI::UnitTypes::Zerg_Cocoon || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker_Egg)
 		return;
 
 	TacticManager::Instance().onUnitShow(unit);
@@ -449,7 +455,8 @@ void Overkill::onUnitShow(BWAPI::Unit unit)
 	//ScoutManager::Instance().onUnitShow(unit);
 	WorkerManager::Instance().onUnitShow(unit);
 	//for first overlord
-	if (unit->getPlayer() == BWAPI::Broodwar->self() && (unit->getType() == BWAPI::UnitTypes::Zerg_Zergling || unit->getType() == BWAPI::UnitTypes::Zerg_Overlord))
+	if (unit->getPlayer() == BWAPI::Broodwar->self() && 
+		(!unit->getType().isBuilding() && !unit->getType().isWorker()))
 	{
 		AttackManager::Instance().onUnitMorph(unit);
 	}
@@ -467,10 +474,10 @@ void Overkill::onUnitCreate(BWAPI::Unit unit)
 
 void Overkill::onUnitDestroy(BWAPI::Unit unit)
 {
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
+	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva
+		|| unit->getType() == BWAPI::UnitTypes::Zerg_Cocoon || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker_Egg)
 		return;
 		
-
 	InformationManager::Instance().onUnitDestroy(unit);
 	if (unit->getPlayer() == BWAPI::Broodwar->self())
 	{
@@ -482,16 +489,34 @@ void Overkill::onUnitDestroy(BWAPI::Unit unit)
 			AttackManager::Instance().onUnitDestroy(unit);
 			TacticManager::Instance().onUnitDestroy(unit);
 		}
+
+		//trigger morph
+		if (!unit->isUnderAttack() && unit->getType().isWorker())
+		{
+			return;
+		}
+		else
+		{
+			StrategyManager::Instance().setReward(unit->getType(), false);
+		}
 	}
 	else if (unit->getPlayer() == BWAPI::Broodwar->enemy())
 	{
 		AttackManager::Instance().onEnemyUnitDestroy(unit);
+		StrategyManager::Instance().setReward(unit->getType(), true);
 	}
 }
 
 void Overkill::onUnitMorph(BWAPI::Unit unit)
 {
-	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva)
+	if (unit->getType() == BWAPI::UnitTypes::Zerg_Lurker_Egg && unit->getBuildType() == BWAPI::UnitTypes::Zerg_Lurker)
+	{
+		AttackManager::Instance().onLurkerMorph();
+		TacticManager::Instance().onLurkerMorph();
+	}
+
+	if (unit->getType() == BWAPI::UnitTypes::Zerg_Egg || unit->getType() == BWAPI::UnitTypes::Zerg_Larva
+		|| unit->getType() == BWAPI::UnitTypes::Zerg_Cocoon || unit->getType() == BWAPI::UnitTypes::Zerg_Lurker_Egg)
 		return;
 
 	InformationManager::Instance().onUnitMorph(unit);
@@ -503,13 +528,36 @@ void Overkill::onUnitMorph(BWAPI::Unit unit)
 		{
 			AttackManager::Instance().onUnitMorph(unit);
 		}
+
+		
 	}
 }
 
 
 void Overkill::onUnitComplete(BWAPI::Unit unit)
 {
-
+	if (unit->getPlayer() == BWAPI::Broodwar->self())
+	{
+		//change the during production features
+		if (unit->getType().isBuilding())
+		{
+			if (unit->getType() == BWAPI::UnitTypes::Zerg_Hatchery)
+			{
+				for (auto b : BWTA::getBaseLocations())
+				{
+					if (unit->getTilePosition().getDistance(b->getTilePosition()) < 10)
+					{
+						StrategyManager::Instance().buildingFinish(unit->getType());
+						break;
+					}
+				}
+			}
+			else
+			{
+				StrategyManager::Instance().buildingFinish(unit->getType());
+			}
+		}
+	}
 }
 
 
@@ -551,6 +599,7 @@ void Overkill::drawStats()
 				BWAPI::Broodwar->drawLineMap(unit->getPosition().x, unit->getPosition().y, unit->getLastCommand().getTargetPosition().x, unit->getLastCommand().getTargetPosition().y, BWAPI::Colors::Green);
 				BWAPI::Broodwar->drawCircleMap(unit->getLastCommand().getTargetPosition().x, unit->getLastCommand().getTargetPosition().y, 8, BWAPI::Colors::Green, true);
 			}*/
+
 		}
 
 		if (unitTypeCounts.find(unit->getType()) == unitTypeCounts.end())

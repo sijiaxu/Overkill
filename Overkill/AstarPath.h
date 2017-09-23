@@ -1,22 +1,22 @@
 #pragma once
-#include "InformationManager.h"
 #include "TimeManager.cpp"
 #include <unordered_map>
 #include <queue>
 
 
+template <typename pType>
 struct fValueGridPoint
 {
-	BWAPI::TilePosition position;
+	pType position;
 	double fValue;
 
-	fValueGridPoint(BWAPI::TilePosition p, double f)
+	fValueGridPoint(pType p, double f)
 	{
 		position = p;
 		fValue = f;
 	}
 
-	bool operator < (const fValueGridPoint& g) const
+	bool operator < (const fValueGridPoint<pType> & g) const
 	{
 		if (fValue > g.fValue)
 			return true;
@@ -24,6 +24,7 @@ struct fValueGridPoint
 			return false;
 	}
 };
+
 
 
 struct costGridPoint
@@ -41,6 +42,6 @@ struct costGridPoint
 
 std::list<BWAPI::TilePosition> aStarPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition, bool isFlyer, bool nearEndPosition = false);
 
-std::list<BWAPI::TilePosition> aStarGroundPathFinding(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition);
+std::list<BWAPI::Position> aStarGroundPathFinding(BWAPI::Position startPosition, BWAPI::Position endPosition);
 
 

@@ -59,6 +59,62 @@ ScoutTactic::ScoutTactic()
 	}
 }
 
+BWAPI::TilePosition	ScoutTactic::getNextScoutLocation()
+{
+	if (zerglingScoutLocation.size() == 0)
+	{
+		std::set<BWTA::Region *> enemyRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->enemy());
+		std::set<BWTA::Region *> myRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+
+		BWAPI::Position enemyBase = InformationManager::Instance().GetEnemyBasePosition();
+		BWAPI::Position enemyNatural = InformationManager::Instance().GetEnemyNaturalPosition();
+
+		for (auto b : BWTA::getBaseLocations())
+		{
+			if (b->isIsland())
+			{
+				continue;
+			}
+
+			if (enemyRegion.find(b->getRegion()) != enemyRegion.end())
+			{
+				if (b->getRegion() == BWTA::getRegion(enemyBase))
+				{
+					zerglingScoutLocation.push_back(scoutTarget(b->getTilePosition(), 10));
+				}
+				else if (b->getRegion() == BWTA::getRegion(enemyNatural))
+				{
+					zerglingScoutLocation.push_back(scoutTarget(b->getTilePosition(), 9));
+				}
+				else
+				{
+					zerglingScoutLocation.push_back(scoutTarget(b->getTilePosition(), 7));
+				}
+			}
+			else if (myRegion.find(b->getRegion()) == myRegion.end())
+			{
+				zerglingScoutLocation.push_back(scoutTarget(b->getTilePosition(), 1));
+			}
+			else
+				continue;
+
+		}
+		std::sort(zerglingScoutLocation.begin(), zerglingScoutLocation.end());
+	}
+
+	if (zerglingScoutLocation.size() > 0)
+	{
+		BWAPI::TilePosition returnValue = zerglingScoutLocation.back().location;
+		zerglingScoutLocation.pop_back();
+		return returnValue;
+	}
+	else
+	{
+		return BWAPI::TilePositions::None;
+	}
+
+}
+
 void ScoutTactic::onUnitDestroy(BWAPI::Unit unit)
 {
 
@@ -111,9 +167,16 @@ void ScoutTactic::assignScoutWork()
 		{
 			if (it->scoutUnit->getType() == BWAPI::UnitTypes::Zerg_Zergling)
 			{
-				it->TileTarget = BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition());
-				overLordScouts.push_back(*it);
-				it = overLordIdle.erase(it);
+				it->TileTarget = getNextScoutLocation();//BWAPI::TilePosition(InformationManager::Instance().GetEnemyBasePosition());
+				if (it->TileTarget != BWAPI::TilePositions::None)
+				{
+					overLordScouts.push_back(*it);
+					it = overLordIdle.erase(it);
+				}
+				else
+				{
+					it++;
+				}
 			}
 			else
 				it++;
@@ -139,7 +202,7 @@ void ScoutTactic::assignScoutWork()
 		std::vector<Scout>::iterator minOverlord;
 		for (std::vector<Scout>::iterator it = overLordIdle.begin(); it != overLordIdle.end(); it++)
 		{
-			if (it->scoutUnit->getDistance(BWAPI::Position(maxPriorityLocation)) < minDistance)
+			if (it->scoutUnit->getDistance(BWAPI::Position(maxPriorityLocation)) < minDistance || minDistance == 999999)
 			{
 				minDistance = it->scoutUnit->getDistance(BWAPI::Position(maxPriorityLocation));
 				minOverlord = it;
@@ -270,24 +333,26 @@ void ScoutTactic::update()
 	{
 		assignScoutWork();
 
-		for (std::vector<Scout>::iterator it = overLordScouts.begin(); it != overLordScouts.end(); it++)
+		for (std::vector<Scout>::iterator it = overLordScouts.begin(); it != overLordScouts.end();)
 		{
 			if (it->scoutUnit->getType() == BWAPI::UnitTypes::Zerg_Zergling)
 			{
 				BattleArmy::smartMove(it->scoutUnit, BWAPI::Position(it->TileTarget));
+				if (it->scoutUnit->getDistance(BWAPI::Position(it->TileTarget)) < 32 * 5 || BWAPI::Broodwar->isVisible(it->TileTarget))
+				{
+					overLordIdle.push_back(*it);
+					it = overLordScouts.erase(it);
+				}
+				else
+				{
+					it++;
+				}
 			}
 			else
 			{
 				overlordMove(*it);
+				it++;
 			}
-			/*
-			if (it->overLord->getDistance(BWAPI::Position(it->TileTarget)) < 32 * 5)//BWAPI::Broodwar->isVisible(it->TileTarget))
-			{
-			overLordIdle.push_back(*it);
-			it = overLordScouts.erase(it);
-			}
-			else
-			it++;*/
 		}
 
 		break;
@@ -304,9 +369,9 @@ void ScoutTactic::generateScoutLocation()
 	BWTA::Chokepoint* maxChoke = nullptr;
 	BOOST_FOREACH(BWTA::Chokepoint* p, nextBase->getChokepoints())
 	{
-		if (InformationManager::Instance().GetOurBaseUnit()->getDistance(p->getCenter()) > maxDist)
+		if (BWAPI::Broodwar->self()->getStartLocation().getDistance(BWAPI::TilePosition(p->getCenter())) > maxDist)
 		{
-			maxDist = InformationManager::Instance().GetOurBaseUnit()->getDistance(p->getCenter());
+			maxDist = BWAPI::Broodwar->self()->getStartLocation().getDistance(BWAPI::TilePosition(p->getCenter()));
 			maxChokeCenter = p->getCenter();
 			maxChoke = p;
 		}
@@ -323,11 +388,19 @@ void ScoutTactic::generateScoutLocation()
 		//scoutLocation.push_back(scoutTarget(BWAPI::TilePosition(reachRegion->getCenter()), 80));
 	}
 
-	BWAPI::Position baseChoke = BWTA::getNearestChokepoint(BWAPI::Broodwar->self()->getStartLocation())->getCenter();
+	std::set<BWTA::Region *> & ourRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	if (ourRegions.find(nextBase) != ourRegions.end())
+	{
+		if (BWAPI::Broodwar->enemy()->getRace() != BWAPI::Races::Terran)
+		{
+			BWAPI::Position baseChoke = BWTA::getNearestChokepoint(BWAPI::Broodwar->self()->getStartLocation())->getCenter();
+			scoutLocation.push_back(scoutTarget(BWAPI::TilePosition(maxChokeCenter), 50));
+		}
+		scoutLocation.push_back(scoutTarget(InformationManager::Instance().getOurNatrualLocation(), 30));
+	}
+	
 
-	scoutLocation.push_back(scoutTarget(BWAPI::TilePosition(maxChokeCenter), 50));
-	scoutLocation.push_back(scoutTarget(InformationManager::Instance().getOurNatrualLocation(), 30));
-	scoutLocation.push_back(scoutTarget(InformationManager::Instance().getOurNatrualLocation(), 30));
+	
 }
 
 void ScoutTactic::overlordMove(Scout& overlord)

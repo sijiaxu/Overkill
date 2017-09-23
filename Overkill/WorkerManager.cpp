@@ -147,7 +147,7 @@ void WorkerManager::updateWorkerStatus()
 void WorkerManager::handleGasWorkers()
 {
 	//if in the middle game stage, we have worker less than 10(means most worker have been killed), mine first
-	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 5000 && ProductionManager::Instance().getTopProductionNeed())
+	if (workerData.getNumWorkers() <= 10 && BWAPI::Broodwar->getFrameCount() > 14400 && ProductionManager::Instance().getTopProductionNeed())
 	{
 		BOOST_FOREACH(BWAPI::Unit unit, workerData.getWorkers())
 		{
@@ -155,6 +155,7 @@ void WorkerManager::handleGasWorkers()
 		}
 		return;
 	}
+	
 
 	// for each unit we have
 	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->self()->getUnits())
@@ -354,7 +355,7 @@ BWAPI::Unit WorkerManager::getClosestDepot(BWAPI::Unit worker)
 
 	BOOST_FOREACH(BWAPI::Unit myBase, InformationManager::Instance().getOurAllBaseUnit())
 	{
-		if ((myBase->isCompleted() || myBase->getType() != BWAPI::UnitTypes::Zerg_Hatchery) && !workerData.depotIsFull(myBase))
+		if (((myBase->isCompleted() || myBase->getType() != BWAPI::UnitTypes::Zerg_Hatchery) && !workerData.depotIsFull(myBase)))
 		{
 			double distance = worker->getDistance(myBase);
 			if (!closestDepot || distance < closestDistance)
@@ -421,18 +422,6 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 	// look through each worker that had moved there first
 	BOOST_FOREACH(BWAPI::Unit unit, workerData.getWorkers())
 	{
-		// mining worker check
-		if (unit->isCompleted() && (workerData.getWorkerJob(unit) == WorkerData::Minerals))
-		{
-			// if it is a new closest distance, set the pointer
-			double distance = unit->getDistance(BWAPI::Position(b.finalPosition));
-			if (!closestMiningWorker || distance < closestMiningWorkerDistance)
-			{
-				closestMiningWorker = unit;
-				closestMiningWorkerDistance = distance;
-			}
-		}
-
 		// moving worker check
 		if (unit->isCompleted() && (workerData.getWorkerJob(unit) == WorkerData::Move))
 		{
@@ -444,6 +433,28 @@ BWAPI::Unit WorkerManager::getBuilder(Building & b, bool setJobAsBuilder)
 				closestMovingWorkerDistance = distance;
 			}
 		}
+		else
+		{
+			if (unit->isCompleted() && closestMovingWorker == NULL)
+			{
+				double distance = unit->getDistance(BWAPI::Position(b.finalPosition));
+				closestMovingWorker = unit;
+				closestMovingWorkerDistance = distance;
+			}
+		}
+		
+		if (unit->isCompleted() && (workerData.getWorkerJob(unit) == WorkerData::Minerals))
+		{
+			// if it is a new closest distance, set the pointer
+			double distance = unit->getDistance(BWAPI::Position(b.finalPosition));
+			if (!closestMiningWorker || distance < closestMiningWorkerDistance)
+			{
+				closestMiningWorker = unit;
+				closestMiningWorkerDistance = distance;
+			}
+		}
+
+
 	}
 
 	BWAPI::Unit chosenWorker = NULL;

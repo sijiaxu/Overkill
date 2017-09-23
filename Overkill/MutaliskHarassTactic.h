@@ -34,6 +34,7 @@ class MutaliskHarassTactic : public BattleTactic
 
 	void					locationAssign(MutaliskArmy* mutalisk, BWAPI::Position endPosition, tacticState nextState, bool nearPosition);
 	void					locationMove(MutaliskArmy* mutalisk, tacticState nextState);
+
 	
 public:
 	MutaliskHarassTactic();
@@ -46,6 +47,7 @@ public:
 
 	void					generateAttackPath(BWAPI::TilePosition startPosition, BWAPI::TilePosition endPosition);
 	int						needRetreat();
+	virtual void			retreatSet();
 
 	
 };

@@ -53,6 +53,9 @@ class ScoutTactic : public BattleTactic
 	std::vector<Scout>			overLordIdle;
 	std::vector<Scout>			overLordScouts;
 
+	std::vector<scoutTarget>	zerglingScoutLocation;
+	BWAPI::TilePosition			getNextScoutLocation();
+
 	void						assignScoutWork();
 	void						smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition) const;
 	void						overlordMove(Scout& overlord);

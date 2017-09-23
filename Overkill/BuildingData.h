@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.h"
+#include "MetaType.h"
 
 class Building {
 
@@ -18,6 +19,7 @@ public:
 	int lastOrderFrame;
 	bool buildCommandGiven;
 	bool underConstruction;
+	std::vector<MetaType> waitingBuildType;
 
 	Building()
 		: desiredPosition(0, 0), finalPosition(BWAPI::TilePositions::None), position(0, 0),
@@ -25,6 +27,7 @@ public:
 		builderUnit(NULL), lastOrderFrame(0), buildCommandGiven(false), underConstruction(false) 
 	{
 		buildingState = initBuilderAndLocation;
+		waitingBuildType = std::vector<MetaType>();
 	}
 
 	// constructor we use most often
@@ -34,6 +37,16 @@ public:
 		lastOrderFrame(0), buildCommandGiven(false), underConstruction(false) 
 	{
 		buildingState = initBuilderAndLocation;
+		waitingBuildType = std::vector<MetaType>();
+	}
+
+	Building(BWAPI::UnitType t, BWAPI::TilePosition desired, std::vector<MetaType> w)
+		: desiredPosition(desired), finalPosition(0, 0), position(0, 0),
+		type(t), buildingUnit(NULL), builderUnit(NULL),
+		lastOrderFrame(0), buildCommandGiven(false), underConstruction(false)
+	{
+		buildingState = initBuilderAndLocation;
+		waitingBuildType = w;
 	}
 
 	// equals operator

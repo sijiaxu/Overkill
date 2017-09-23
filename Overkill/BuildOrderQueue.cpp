@@ -71,6 +71,8 @@ void BuildOrderQueue::skipItem()
 	numSkippedItems++;
 }
 
+
+
 bool BuildOrderQueue::canSkipItem() {
 
 	// does the queue have more elements
@@ -91,54 +93,55 @@ bool BuildOrderQueue::canSkipItem() {
 	return highestNotBlocking;
 }
 
-void BuildOrderQueue::queueItem(BuildOrderItem<PRIORITY_TYPE> b)
+void BuildOrderQueue::queueItem(MetaType m, bool blocking, PRIORITY_TYPE priority, std::vector<MetaType> waitingBuildType)
 {
 	// if the queue is empty, set the highest and lowest priorities
 	if (queue.empty())
 	{
-		highestPriority = b.priority;
-		lowestPriority = b.priority;
+		highestPriority = priority;
+		lowestPriority = priority;
 	}
 
 	// push the item into the queue
-	if (b.priority <= lowestPriority)
+	if (priority <= lowestPriority)
 	{
-		queue.push_front(b);
+		queue.push_front(BuildOrderItem<PRIORITY_TYPE>(m, priority, blocking, waitingBuildType));
 	}
 	else
 	{
-		queue.push_back(b);
+		queue.push_back(BuildOrderItem<PRIORITY_TYPE>(m, priority, blocking, waitingBuildType));
 	}
 
 	// if the item is somewhere in the middle, we have to sort again
-	if ((queue.size() > 1) && (b.priority < highestPriority) && (b.priority > lowestPriority))
+	if ((queue.size() > 1) && (priority < highestPriority) && (priority > lowestPriority))
 	{
 		// sort the list in ascending order, putting highest priority at the top
 		std::sort(queue.begin(), queue.end());
 	}
 
 	// update the highest or lowest if it is beaten
-	highestPriority = (b.priority > highestPriority) ? b.priority : highestPriority;
-	lowestPriority = (b.priority < lowestPriority) ? b.priority : lowestPriority;
+	highestPriority = (priority > highestPriority) ? priority : highestPriority;
+	lowestPriority = (priority < lowestPriority) ? priority : lowestPriority;
 }
 
-void BuildOrderQueue::queueAsHighestPriority(MetaType m, bool blocking)
+void BuildOrderQueue::queueAsHighestPriority(MetaType m, bool blocking, std::vector<MetaType> waitingBuildType)
 {
 	// the new priority will be higher
 	PRIORITY_TYPE newPriority = highestPriority + defaultPrioritySpacing;
 
 	// queue the item
-	queueItem(BuildOrderItem<PRIORITY_TYPE>(m, newPriority, blocking));
+	queueItem(m, blocking, newPriority, waitingBuildType);
 }
 
-void BuildOrderQueue::queueAsLowestPriority(MetaType m, bool blocking)
+void BuildOrderQueue::queueAsLowestPriority(MetaType m, bool blocking, std::vector<MetaType> waitingBuildType)
 {
 	// the new priority will be higher
 	int newPriority = lowestPriority - defaultPrioritySpacing;
 
 	// queue the item
-	queueItem(BuildOrderItem<PRIORITY_TYPE>(m, newPriority, blocking));
+	queueItem(m, blocking, newPriority, waitingBuildType);
 }
+
 
 int BuildOrderQueue::removeUnitType(BWAPI::UnitType uType)
 {
@@ -152,6 +155,24 @@ int BuildOrderQueue::removeUnitType(BWAPI::UnitType uType)
 	}
 	return 0;
 }
+
+
+void BuildOrderQueue::removeStrategyItem(std::string targetStrategy)
+{
+	for (std::deque< BuildOrderItem<PRIORITY_TYPE>>::iterator it = queue.begin(); it != queue.end();)
+	{
+		if (it->metaType.unitSourceBuildingAction == targetStrategy)
+		{
+			it = queue.erase(it);
+		}
+		else
+		{
+			it++;
+		}
+	}
+
+}
+
 
 
 void BuildOrderQueue::removeHighestPriorityItem()

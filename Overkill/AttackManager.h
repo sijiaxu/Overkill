@@ -8,6 +8,12 @@
 #include "MutaliskArmy.h"
 #include "HydraliskArmy.h"
 #include "OverLordArmy.h"
+#include "LurkerArmy.h"
+#include "ScourgeArmy.h"
+#include "UltraliskArmy.h"
+#include "DevourerArmy.h"
+#include "GuardianArmy.h"
+
 #include "TacticManager.h"
 #include "UnitState.h"
 #include "AstarPath.h"
@@ -78,7 +84,7 @@ class AttackManager{
 	void					DefendProductionStrategy(int myTotalArmySupply, int enemyTotalSupply);
 
 	void					popAttackPosition(BWAPI::Position popPosition);
-	BWAPI::Position			getNextAttackPosition(bool isGround);
+	
 	bool					tacticTrigCondition(int tac, BWAPI::Position attackPosition);
 	void					triggerTactic(tacticType tacType, BWAPI::Position attackPosition);
 
@@ -87,17 +93,26 @@ class AttackManager{
 	bool					isFirstHydraAttack;
 
 	void					ScoutUpdate();
+	int						nextScoutTime;
+
+	bool					isHaveAntiAirUnit();
 
 public:
 	
 	void					update();
+	void					issueAttackCommand(tacticType type, BWAPI::Position attackPosition = BWAPI::Positions::None);
+	BWAPI::Position			getNextAttackPosition(bool isGround);
+
 	void					onUnitMorph(BWAPI::Unit unit);
 	void					onUnitDestroy(BWAPI::Unit unit);
+	void					onLurkerMorph();
 	void					onEnemyUnitDestroy(BWAPI::Unit unit);
 
 	void					addTacticRemainArmy(std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy, tacticType tacType, BWAPI::Position attackTarget, bool endByDefend);
 	bool					isNeedRetreatDefend() { return isNeedTacticDefend; }
 	bool					isUnderAttack() { return isNeedDefend; }
+
+	std::map<BWAPI::UnitType, int> reaminArmy();
 	
 	static AttackManager&	Instance();
 

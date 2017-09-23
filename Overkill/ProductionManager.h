@@ -68,6 +68,7 @@ class ProductionManager
 	int							recoverDroneCount;
 	std::vector<RecoverBuildingInfo> recoverBuilding;
 
+	bool						checkProductionDeadLock(BWAPI::UnitType targetType);
 	BWAPI::UnitType				getProducer(MetaType t);
 
 	bool						contains(UnitVector & units, BWAPI::Unit unit);
@@ -77,13 +78,13 @@ class ProductionManager
 	bool						hasNumCompletedUnitType(BWAPI::UnitType type, int num);
 	bool						meetsReservedResources(MetaType type);
 	
-	void						createMetaType(BWAPI::Unit producer, MetaType type);
+	void						createMetaType(BWAPI::Unit producer, BuildOrderItem<PRIORITY_TYPE> currentItem);
 	void						manageBuildOrderQueue();
 	void						performCommand(BWAPI::UnitCommandType t);
 	bool						canMakeNow(BWAPI::Unit producer, MetaType t);
 	void						predictWorkerMovement( Building & b);
 
-	bool						detectBuildOrderDeadlock();
+	bool						detectNeedMorphOverLord();
 
 	int							getFreeMinerals();
 	int							getFreeGas();
@@ -119,6 +120,14 @@ class ProductionManager
 	int							nextStrategyCheckTime;
 	std::string					curStrategyAction;
 
+	MetaType					curBuildingTarget;
+	int							maxOneSecondProduction;
+	int							curOneSecondProduction;
+
+	bool						isDepotNearlyFull();
+
+
+
 public:
 
 	static ProductionManager &	Instance();
@@ -140,9 +149,14 @@ public:
 	void						defendLostRecover();
 	void						clearDefendVector();
 
+	void						buildingCallback(BWAPI::Unit curBuildingUnit, std::vector<MetaType> buildingOrders);
+	void						addItemInQueue(MetaType m, bool blocking, std::vector<MetaType> waitingBuildType) { queue.queueAsHighestPriority(m, blocking, waitingBuildType); }
+
+	void						triggerBuildingOrder(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, std::string unitSourceBuildingAction);
 	void						triggerBuilding(BWAPI::UnitType buildingType, BWAPI::TilePosition buildingLocation, int count, bool isBlocking = true, bool needBuildWorker = true);
 	void						triggerUnit(BWAPI::UnitType unitType, int unitCount, bool isHighPriority = true, bool isBlocking = false);
 	void						triggerUpgrade(BWAPI::UpgradeType upgrade, bool isBlocking = false) { queue.queueAsHighestPriority(MetaType(upgrade), isBlocking); }
+	void						triggerTech(BWAPI::TechType tech, bool isBlocking = true) { queue.queueAsHighestPriority(MetaType(tech), isBlocking); }
 
 	void						clearCurrentQueue(){ queue.clearAllUnit(); }
 	void						setBuildOrder(const std::vector<MetaType> & buildOrder, bool isBlock);

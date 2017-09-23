@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Overkill", "Overkill\Overkill.vcxproj", "{511A7A57-A758-4528-A744-D51FED813DC5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MachineLearningModules", "MachineLearning\MachineLearning.vcxproj", "{7A2D1593-ED78-41D4-BC0F-38353D348055}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +17,10 @@ Global
 		{511A7A57-A758-4528-A744-D51FED813DC5}.Debug|Win32.Build.0 = Debug|Win32
 		{511A7A57-A758-4528-A744-D51FED813DC5}.Release|Win32.ActiveCfg = Release|Win32
 		{511A7A57-A758-4528-A744-D51FED813DC5}.Release|Win32.Build.0 = Release|Win32
+		{7A2D1593-ED78-41D4-BC0F-38353D348055}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7A2D1593-ED78-41D4-BC0F-38353D348055}.Debug|Win32.Build.0 = Debug|Win32
+		{7A2D1593-ED78-41D4-BC0F-38353D348055}.Release|Win32.ActiveCfg = Release|Win32
+		{7A2D1593-ED78-41D4-BC0F-38353D348055}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

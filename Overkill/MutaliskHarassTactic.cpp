@@ -23,7 +23,7 @@ void MutaliskHarassTactic::onUnitShow(BWAPI::Unit unit)
 		{
 			triggerChangeTime = BWAPI::Broodwar->getFrameCount() + 25 * 4;
 
-			if (state == MOVE || state == BACKMOVE)
+			if (state == MOVE)
 			{
 				state = LOCATIONASSIGN;
 			}
@@ -117,8 +117,7 @@ void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState next
 	//BWAPI::Position avgP(avgX, avgY);
 	BWAPI::Position avgP = mutalisk->getUnits().front().unit->getPosition();
 
-	//if (avgP.getDistance(armyStartPosition) > 30 * 32 && BWTA::getRegion(avgP) != BWTA::getRegion(armyStartPosition) && nearbyUnits.size() > 0 && needRetreat() == 1)
-		
+	/*
 	if ((startEnemyCanAttack == true && nearbyUnits.size() > 0)
 		|| (startEnemyCanAttack == false && avgP.getDistance(armyStartPosition) > 30 * 32 && BWTA::getRegion(avgP) != BWTA::getRegion(armyStartPosition) && nearbyUnits.size() > 0))
 	{
@@ -126,7 +125,7 @@ void MutaliskHarassTactic::locationMove(MutaliskArmy* mutalisk, tacticState next
 		state = ATTACK;
 		return;
 	}
-
+	*/
 	
 	if (unitMovePath.size() / double(mutalisk->getUnits().size()) <= 0.1)
 	{
@@ -218,7 +217,7 @@ void MutaliskHarassTactic::update()
 	int ourSupply = int(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * BWAPI::UnitTypes::Zerg_Mutalisk.supplyRequired());
 	if (ourSupply * 0.8 < antiairBuildingCount * 10)
 	{
-		state = END;
+		retreatSet();
 	}
 
 	nearbyUnits.clear();
@@ -257,6 +256,27 @@ void MutaliskHarassTactic::update()
 		}
 	}
 
+	bool isUnderAttack = false;
+	for (auto army : tacticArmy)
+	{
+		if (army.first != BWAPI::UnitTypes::Zerg_Overlord)
+		{
+			for (auto u : army.second->getUnits())
+			{
+				if (u.unit->isUnderAttack())
+				{
+					isUnderAttack = true;
+					break;
+				}
+			}
+		}
+
+		if (isUnderAttack == true)
+		{
+			break;
+		}
+	}
+
 	// do tactic FSM update
 	switch (state)
 	{
@@ -271,19 +291,6 @@ void MutaliskHarassTactic::update()
 	case MOVE:
 	{
 		locationMove(mutalisk, ATTACK);
-		break;
-	}
-	
-	case BACKLOCATIONASSIGN:
-	{
-		//BWAPI::Broodwar->printf("BACKLOCATIONASSIGN");
-
-		locationAssign(mutalisk, groupPosition, BACKMOVE, true);
-		break;
-	}
-	case BACKMOVE:
-	{
-		locationMove(mutalisk, LOCATIONASSIGN);
 		break;
 	}
 
@@ -301,18 +308,33 @@ void MutaliskHarassTactic::update()
 			if (noTarget)
 			{
 				if (!hasEnemy())
-					state = END;
+				{
+					retreatSet();
+				}
 			}
 
 			TimerManager::Instance().stopTimer(TimerManager::MutaAttack);
 		}
 		else
 		{
-			state = END;
-			break;
+			retreatSet();
 		}
 		break;
 	} 
+	case RETREAT:
+	{
+		locationMove(mutalisk, END);
+
+		if ((nearbyUnits.size() == 0 && !isUnderAttack) || BWAPI::Broodwar->getFrameCount() >= retreatTime)
+		{
+			//when current is not under attack, end this tactic.
+			state = END;
+			break;
+		}
+
+	}
+	break;
+
 	}
 
 	TimerManager::Instance().stopTimer(TimerManager::MutaliskTac);
@@ -393,6 +415,23 @@ bool MutaliskHarassTactic::hasEnemy()
 }
 
 
+void MutaliskHarassTactic::retreatSet()
+{
+	if (state == RETREAT)
+		return;
+
+	state = RETREAT;
+	std::set<BWTA::Region *> & myRegions = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+	retreatTime = BWAPI::Broodwar->getFrameCount() + 20 * 25;
+
+	if (myRegions.size() > 1)
+		nextRetreatPosition = BWAPI::Position(InformationManager::Instance().getOurNatrualLocation());
+	else
+		nextRetreatPosition = BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation());
+
+	MutaliskArmy* mutalisk = dynamic_cast<MutaliskArmy*>(tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]);
+	locationAssign(mutalisk, nextRetreatPosition, RETREAT, false);
+}
 
 int MutaliskHarassTactic::needRetreat()
 {
@@ -462,29 +501,9 @@ int MutaliskHarassTactic::needRetreat()
 	}
 	
 	int enemySupply = inRegionEnemySupply + outRegionEnemySupply ;
-
-	//if has new army and 
-	// our army less than enemy  and our army are not severely damaged
-	//regroup at the middle position
-	/*if (newAddArmy.size() > 0 &&
-		(int(ourSupply * 0.7) < enemySupply
-		|| lowHealthCount >= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * 0.7))
-	{
-		BWAPI::Broodwar->printf("retreat back true");
-
-		double2 distance((*tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().begin()).unit->getPosition() - (*newAddArmy.begin()).first->getPosition());
-		int distanceLength = int(distance.len());
-		groupPosition = double2((*newAddArmy.begin()).first->getPosition()) + distance.normal() * (distanceLength / 3);
-		//groupPosition = (*newAddArmy.begin()).first->getPosition();
-		addAllNewArmy();
-		state = BACKLOCATIONASSIGN;
-		return 0;
-	}
-	else*/ if (ourSupply < enemySupply
+	if (ourSupply < enemySupply
 	|| (lowHealthCount >= tacticArmy[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size() * 0.7 && ourSupply * 0.3 <= enemySupply))
 	{
-		//BWAPI::Broodwar->printf("retreat true!!!!!");
-		//state = END;
 		return 0;
 	}
 	else
@@ -496,7 +515,6 @@ bool MutaliskHarassTactic::isTacticEnd()
 {
 	if (state == END || state == WIN)
 	{
-		BWAPI::Broodwar->printf("mutalisk end!!!");
 		return true;
 	}
 		

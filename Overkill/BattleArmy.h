@@ -3,47 +3,6 @@
 #include "UnitState.h"
 
 
-struct EnemyUnit
-{
-	BWAPI::Unit unit;
-	int priority;
-	int distance;
-	int assignCount;
-
-	EnemyUnit()
-	{
-		unit = NULL;
-		priority = 0;
-		distance = 0;
-		assignCount = 0;
-	}
-
-	EnemyUnit(BWAPI::Unit u, int p, int d)
-	{
-		unit = u;
-		priority = p;
-		distance = d;
-		assignCount = 0;
-	}
-
-	bool operator < (const EnemyUnit& u) const
-	{
-		if (priority < u.priority)
-			return true;
-		else if (priority > u.priority)
-			return false;
-		//priority == u.priority
-		else
-		{
-			//distance less, priority higher
-			if (distance > u.distance)
-				return true;
-			else
-				return false;
-		}
-	}
-};
-
 struct unitDistance
 {
 	BWAPI::Unit unit;
@@ -70,17 +29,18 @@ class BattleArmy
 {
 protected:
 	std::vector<UnitState>	units;
-
-	int							calMaxAssign(BWAPI::Unit enemyUnit, BWAPI::UnitType ourType);
-
+	
 	void						moveAbnormalUnits();
+	
+	int							onlyGroundAttackPriority(BWAPI::Unit unit);
+	int							onlyAirAttackPriority(BWAPI::Unit unit);
 
 public:
 	BattleArmy() { units.reserve(100); }
-	virtual void				defend(BWAPI::Position targetPosition) = 0;
-	virtual void				attack(BWAPI::Position priorityPosition) = 0;
-	virtual void				mixAttack(BWAPI::Position priorityPosition, std::set<BWAPI::Unit> enemySet) {};
-	void						assignTarget(std::vector<EnemyUnit>& priorityEnemy, BWAPI::UnitType armyType, BWAPI::Position targetPosition);
+	virtual std::vector<EnemyUnit>				mixAttack(BWAPI::Position targetPosition, std::set<BWAPI::Unit> enemySet);
+	virtual int					getAttackPriority(BWAPI::Unit unit);
+	void						assignTarget(std::vector<EnemyUnit>& priorityEnemy, BWAPI::UnitType armyType,
+		BWAPI::Position targetPosition, std::set<BWAPI::Unit>& enemySet, std::set<BWAPI::Unit>& attackingUnits);
 
 	void						addUnit(BWAPI::Unit u);
 	std::vector<UnitState>&		getUnits() { return units; }
@@ -92,11 +52,14 @@ public:
 	bool						isInDanger(BWAPI::Unit u);
 
 	void						removeUnit(BWAPI::Unit u);
-
+	
+	void						attackMoveLowHealth(BWAPI::Unit attacker, BWAPI::Position targetPosition, BWAPI::Unit targetUnit = NULL);
 	static void					smartAttackUnit(BWAPI::Unit attacker, BWAPI::Unit target);
 	static void					smartAttackMove(BWAPI::Unit attacker, BWAPI::Position targetPosition);
 	static void					smartMove(BWAPI::Unit attacker, BWAPI::Position targetPosition);
 
+	static int					calMaxAssign(BWAPI::Unit enemyUnit, BWAPI::UnitType ourType);
+	
 };
 
 

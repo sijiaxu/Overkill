@@ -19,8 +19,6 @@ class HydraliskTactic : public BattleTactic
 	std::set<BWAPI::Unit>				nearbySunkens;
 	std::set<BWAPI::Unit>				friendUnitNearBy;
 	int									nextAttackTime;
-	int									retreatTime;
-	BWAPI::Position						nextRetreatPosition;
 
 	int									retreatCount;
 public:
@@ -28,7 +26,7 @@ public:
 
 	virtual void			update();
 	bool					isTacticEnd();
-	bool					needRetreat(BWAPI::Unit firstUnit);
+	bool					needRetreat(BWAPI::Unit firstUnit, bool hasDetector);
 	void					generateAttackPath();
 };
 

@@ -11,6 +11,7 @@ BuildingManager::BuildingManager()
 
 }
 
+
 // gets called every frame from GameCommander
 void BuildingManager::update()
 {
@@ -65,14 +66,56 @@ void BuildingManager::update()
 
 		if (it->buildingState == Building::end)
 		{
+			/*
+			if (it->type == BWAPI::UnitTypes::Zerg_Hatchery)
+			{
+				for (auto b : BWTA::getBaseLocations())
+				{
+					if (it->desiredPosition == b->getTilePosition())
+					{
+						StrategyManager::Instance().buildingFinish(it->type);
+						break;
+					}
+				}
+			}
+			else
+			{
+				StrategyManager::Instance().buildingFinish(it->type);
+			}
+			*/
+
+			BWAPI::Broodwar->printf("building manger end: %s\n", it->type.c_str());
+
+
+			//execute the callback function and data
+			ProductionManager::Instance().buildingCallback(it->builderUnit, it->waitingBuildType);
 			reservedMinerals -= it->type.mineralPrice();
 			reservedGas -= it->type.gasPrice();
+			if (it->type == BWAPI::UnitTypes::Zerg_Hatchery)
+			{
+				InformationManager::Instance().removeFakeOccupiedBase(it->finalPosition);
+			}
 			it = buildingData.erase(it);
 		}
 		else
 			it++;
 	}
 }
+
+
+void BuildingManager::builderNotExist(Building& b)
+{
+	if(!b.builderUnit->exists())
+	{
+		b.builderUnit = NULL;
+		b.buildingState = Building::initBuilderAndLocation;
+		return;
+
+		//b.buildingState = Building::end;
+		//StrategyManager::Instance().buildingFinish(b.type);
+	}
+}
+
 
 // STEP 2: ASSIGN WORKERS TO BUILDINGS WITHOUT THEM
 void BuildingManager::assignWorkersToUnassignedBuildings(Building& b)
@@ -139,10 +182,16 @@ void BuildingManager::exploreUnseenPosition(Building& b)
 {
 	if (!b.builderUnit->exists())
 	{
-		b.buildingState = Building::initBuilderAndLocation;
-		//if worker have been killed outside, build hatchery at main base
 		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
-			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
+		{
+			b.buildingState = Building::end;
+			StrategyManager::Instance().buildingFinish(b.type);
+		}
+		else
+		{
+			b.builderUnit = NULL;
+			b.buildingState = Building::initBuilderAndLocation;
+		}
 		return;
 	}
 
@@ -173,9 +222,16 @@ void BuildingManager::constructAssignedBuildings(Building& b)
 {
 	if (!b.builderUnit->exists())
 	{
-		b.buildingState = Building::initBuilderAndLocation;
 		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
-			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
+		{
+			b.buildingState = Building::end;
+			StrategyManager::Instance().buildingFinish(b.type);
+		}
+		else
+		{
+			b.builderUnit = NULL;
+			b.buildingState = Building::initBuilderAndLocation;
+		}
 		return;
 	}
 
@@ -189,16 +245,21 @@ void BuildingManager::buildingOrderCheck(Building& b)
 {
 	if (!b.builderUnit->exists())
 	{
-		b.buildingState = Building::initBuilderAndLocation;
 		if (b.type == BWAPI::UnitTypes::Zerg_Hatchery)
-			b.desiredPosition = BWAPI::Broodwar->self()->getStartLocation();
+		{
+			b.buildingState = Building::end;
+			StrategyManager::Instance().buildingFinish(b.type);
+		}
+		else
+		{
+			b.builderUnit = NULL;
+			b.buildingState = Building::initBuilderAndLocation;
+		}
 		return;
 	}
 
 	if (b.builderUnit->isMorphing())
 	{
-		//WorkerManager::Instance().finishedWithWorker(b.builderUnit);
-		b.builderUnit = NULL;
 		b.buildingState = Building::end;
 	}
 	//if build command fail, something is wrong
@@ -223,7 +284,18 @@ BWAPI::TilePosition BuildingManager::getBuildingLocation( Building & b)
 	}
 
 	if (b.type == BWAPI::UnitTypes::Zerg_Creep_Colony) // b.type == BWAPI::UnitTypes::Zerg_Hatchery || 
-		testLocation = getBuildLocationNear(b, 0, false);
+	{
+		if (BWAPI::Broodwar->self()->allUnitCount(BWAPI::UnitTypes::Zerg_Sunken_Colony) <= 3)
+		{
+			testLocation = getBuildLocationNear(b, 0, false);
+		}
+		else
+		{
+			testLocation = getBuildLocationNear(b, 1, false);
+		}
+		
+
+	}
 	else
 		testLocation = getBuildLocationNear(b, 0, false);
 
@@ -278,41 +350,26 @@ BWAPI::TilePosition BuildingManager::getBuildLocationNear(Building & b, int buil
 		{
 			iter++;
 
-			if (iter > 10000)
+			if (iter > 1000)
 			{
-				b.desiredPosition = InformationManager::Instance().getOurNatrualLocation();
+				std::set<BWTA::Region *> & ourRegion = InformationManager::Instance().getOccupiedRegions(BWAPI::Broodwar->self());
+				for (auto r : ourRegion)
+				{
+					if (BWTA::getRegion(b.desiredPosition) != r)
+					{
+						b.desiredPosition = BWAPI::TilePosition(r->getCenter());
+						break;
+					}
+				}
 				return BWAPI::TilePositions::None;
 			}
 
 			// can we build this building at this location
 			bool canBuild = this->canBuildHereWithSpace(BWAPI::TilePosition(x, y), b, buildDist, horizontalOnly);
 
-			// my starting region
-			BWTA::Region * myRegion = BWTA::getRegion(BWAPI::Broodwar->self()->getStartLocation());
-
-			// the region the build tile is in
-			BWTA::Region * tileRegion = BWTA::getRegion(BWAPI::TilePosition(x, y));
-
-			// is the proposed tile in our region?
-			bool tileInRegion = (tileRegion == myRegion);
-
-			// if this location has priority to be built within our own region
-			if (inRegionPriority)
+			if (canBuild)
 			{
-				// if the tile is in region and we can build it there
-				if (tileInRegion && canBuild)
-				{
-					// return that position
-					return BWAPI::TilePosition(x, y);
-				}
-			}
-			// otherwise priority is not set for this building
-			else
-			{
-				if (canBuild)
-				{
-					return BWAPI::TilePosition(x, y);
-				}
+				return BWAPI::TilePosition(x, y);
 			}
 		}
 
@@ -375,14 +432,8 @@ bool BuildingManager::canBuildHereWithSpace(BWAPI::TilePosition position, const 
 	int endy = position.y + height + buildDist;
 
 
-	if (horizontalOnly)
-	{
-		starty += buildDist;
-		endy -= buildDist;
-	}
-
 	// if this rectangle doesn't fit on the map we can't build here
-	if (startx < 0 || starty < 0 || endx > BWAPI::Broodwar->mapWidth() || endx < position.x + width || endy > BWAPI::Broodwar->mapHeight())
+	if (startx < 0 || starty < 0 || endx > BWAPI::Broodwar->mapWidth() - 1 || endy > BWAPI::Broodwar->mapHeight() - 1)
 	{
 		return false;
 	}
@@ -422,7 +473,7 @@ bool BuildingManager::buildable(int x, int y, const Building & b) const
 
 	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getUnitsOnTile(x, y))
 	{
-		if (unit->getType().isBuilding() && !unit->isLifted())
+		if (unit->getType().isBuilding())
 		{
 			return false;
 		}
@@ -449,7 +500,8 @@ bool BuildingManager::isEvolvedBuilding(BWAPI::UnitType type) {
 }
 
 // add a new building to be constructed
-void BuildingManager::addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition desiredLocation) {
+void BuildingManager::addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition desiredLocation, std::vector<MetaType> waitingBuildType) 
+{
 
 	if (debugMode) { BWAPI::Broodwar->printf("Issuing addBuildingTask: %s", type.getName().c_str()); }
 
@@ -461,8 +513,9 @@ void BuildingManager::addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition 
 
 	// set it up to receive a worker
 	//buildingData.addBuilding(ConstructionData::Unassigned, Building(type, desiredLocation));
-	buildingData.push_back(Building(type, desiredLocation));
+	buildingData.push_back(Building(type, desiredLocation, waitingBuildType));
 }
+
 
 bool BuildingManager::isBuildingPositionExplored(const Building & b) const
 {

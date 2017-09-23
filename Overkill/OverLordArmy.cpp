@@ -1,15 +1,11 @@
 #include "OverLordArmy.h"
 
-void OverLordArmy::attack(BWAPI::Position targetPosition)
+
+std::vector<EnemyUnit> OverLordArmy::mixAttack(BWAPI::Position targetPosition, std::set<BWAPI::Unit> enemySet)
 {
 	armyMove(targetPosition);
+	return std::vector<EnemyUnit>();
 }
-
-void OverLordArmy::defend(BWAPI::Position targetPosition)
-{
-	armyMove(targetPosition);
-}
-
 
 void OverLordArmy::follow(BWAPI::Unit target)
 {

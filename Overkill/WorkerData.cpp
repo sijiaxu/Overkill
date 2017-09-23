@@ -112,7 +112,7 @@ void WorkerData::setWorkerJob(BWAPI::Unit unit, enum WorkerJob job, BWAPI::Unit 
 		addToMineralPatch(mineralToMine, 1);
 
 		// right click the mineral to start mining
-		unit->rightClick(mineralToMine);
+		unit->gather(mineralToMine);
 	}
 	else if (job == Gas)
 	{
@@ -123,7 +123,7 @@ void WorkerData::setWorkerJob(BWAPI::Unit unit, enum WorkerJob job, BWAPI::Unit 
 		workerRefineryMap[unit] = jobUnit;
 
 		// right click the refinery to start harvesting
-		unit->rightClick(jobUnit);
+		unit->gather(jobUnit);
 	}
 	else if (job == Repair)
 	{
@@ -294,7 +294,6 @@ std::vector<BWAPI::Unit> WorkerData::getMineralPatchesNearDepot(BWAPI::Unit depo
 {
 	// if there are minerals near the depot, add them to the set
 	std::vector<BWAPI::Unit> mineralsNearDepot;
-
 	int radius = 300;
 
 	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
@@ -305,36 +304,64 @@ std::vector<BWAPI::Unit> WorkerData::getMineralPatchesNearDepot(BWAPI::Unit depo
 		}
 	}
 
+	const std::set<BWTA::Chokepoint*>& depotChokes = BWTA::getRegion(depot->getPosition())->getChokepoints();
+	std::set<BWAPI::Unit> mineralsAtChoke;
+	for (auto m : BWAPI::Broodwar->getMinerals())
+	{
+		for (auto r : depotChokes)
+		{
+			if (m->getInitialPosition().getDistance(r->getCenter()) < 2 * 32)
+			{
+				mineralsAtChoke.insert(m);
+			}
+		}
+	}
+	mineralsNearDepot.insert(mineralsNearDepot.end(), mineralsAtChoke.begin(), mineralsAtChoke.end());
+
 	// if we didn't find any, use the whole map
 	if (mineralsNearDepot.empty())
 	{
-		BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
+		for (auto m : BWAPI::Broodwar->getMinerals())
 		{
-			if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field))
-			{
-				mineralsNearDepot.push_back(unit);
-			}
+			mineralsNearDepot.push_back(m);
 		}
 	}
 
 	return mineralsNearDepot;
 }
 
+
 int WorkerData::getMineralsNearDepot(BWAPI::Unit depot)
 {
 	if (!depot) { return 0; }
 
-	int mineralsNearDepot = 0;
+	std::vector<BWAPI::Unit> mineralsNearDepot;
+	int radius = 300;
 
 	BOOST_FOREACH(BWAPI::Unit unit, BWAPI::Broodwar->getAllUnits())
 	{
-		if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field) && unit->getResources() > 0 && unit->getDistance(depot) < 200)
+		if ((unit->getType() == BWAPI::UnitTypes::Resource_Mineral_Field) && unit->getDistance(depot) < radius)
 		{
-			mineralsNearDepot++;
+			mineralsNearDepot.push_back(unit);
 		}
 	}
 
-	return mineralsNearDepot;
+	const std::set<BWTA::Chokepoint*>& depotChokes = BWTA::getRegion(depot->getPosition())->getChokepoints();
+	std::set<BWAPI::Unit> mineralsAtChoke;
+	for (auto m : BWAPI::Broodwar->getMinerals())
+	{
+		for (auto r : depotChokes)
+		{
+			if (m->getInitialPosition().getDistance(r->getCenter()) < 2 * 32)
+			{
+				mineralsAtChoke.insert(m);
+			}
+		}
+	}
+	mineralsNearDepot.insert(mineralsNearDepot.end(), mineralsAtChoke.begin(), mineralsAtChoke.end());
+
+
+	return mineralsNearDepot.size();
 }
 
 BWAPI::Unit WorkerData::getWorkerResource(BWAPI::Unit unit)
@@ -399,7 +426,6 @@ void WorkerData::balanceWorker(BWAPI::Unit depot)
 BWAPI::Unit WorkerData::getMineralToMine(BWAPI::Unit worker)
 {
 	if (!worker) { return NULL; }
-
 
 	// get the depot associated with this unit
 	BWAPI::Unit depot = getWorkerDepot(worker);

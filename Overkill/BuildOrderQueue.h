@@ -14,8 +14,17 @@ public:
 	MetaType			metaType;		// the thing we want to 'build'
 	T					priority;	// the priority at which to place it in the queue
 	bool				blocking;	// whether or not we block further items
+	std::vector<MetaType> waitingBuildType; //the subsequence items need build in the callback
 
-	BuildOrderItem(MetaType m, T p, bool b) : metaType(m), priority(p), blocking(b) {}
+	BuildOrderItem(MetaType m, T p, bool b) : metaType(m), priority(p), blocking(b) 
+	{
+		waitingBuildType = std::vector<MetaType>();
+	}
+
+	BuildOrderItem(MetaType m, T p, bool b, std::vector<MetaType> w) : metaType(m), priority(p), blocking(b)
+	{
+		waitingBuildType = w;
+	}
 
 	bool operator<(const BuildOrderItem<T> &x) const
 	{
@@ -40,12 +49,14 @@ public:
 	void clearAll();											// clears the entire build order queue
 	void clearAllUnit();
 	void skipItem();											// increments skippedItems
-	void queueAsHighestPriority(MetaType m, bool blocking);		// queues something at the highest priority
-	void queueAsLowestPriority(MetaType m, bool blocking);		// queues something at the lowest priority
-	void queueItem(BuildOrderItem<PRIORITY_TYPE> b);			// queues something with a given priority
+	void queueAsHighestPriority(MetaType m, bool blocking, std::vector<MetaType> waitingBuildType = std::vector<MetaType>());		// queues something at the highest priority
+	void queueAsLowestPriority(MetaType m, bool blocking, std::vector<MetaType> waitingBuildType = std::vector<MetaType>());		// queues something at the lowest priority
+	void queueItem(MetaType m, bool blocking, PRIORITY_TYPE priority, std::vector<MetaType> waitingBuildType = std::vector<MetaType>());			// queues something with a given priority
+
 	void removeHighestPriorityItem();								// removes the highest priority item
 	void removeCurrentHighestPriorityItem();
 	int removeUnitType(BWAPI::UnitType uType);
+	void removeStrategyItem(std::string targetStrategy);
 
 	int getHighestPriorityValue() { return highestPriority; }						// returns the highest priority value
 	int	getLowestPriorityValue() { return lowestPriority; }								// returns the lowest priority value

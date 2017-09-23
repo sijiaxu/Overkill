@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="NeuralNetwork">
+      <UniqueIdentifier>{ee211683-b56f-4ef2-b6e5-222ef0115a0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LinearRegression">
+      <UniqueIdentifier>{dae915f3-8c93-40de-8e6c-0a96a92fad42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SumTree">
+      <UniqueIdentifier>{ce34db75-17e4-49d6-a772-be64b1e50a3b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="test.cpp" />
+    <ClCompile Include="network.cpp">
+      <Filter>NeuralNetwork</Filter>
+    </ClCompile>
+    <ClCompile Include="neuron.cpp">
+      <Filter>NeuralNetwork</Filter>
+    </ClCompile>
+    <ClCompile Include="LinearRegression.cpp">
+      <Filter>LinearRegression</Filter>
+    </ClCompile>
+    <ClCompile Include="SumTree.cpp">
+      <Filter>SumTree</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="network.h">
+      <Filter>NeuralNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="neuron.h">
+      <Filter>NeuralNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="LinearRegression.h">
+      <Filter>LinearRegression</Filter>
+    </ClInclude>
+    <ClInclude Include="SumTree.h">
+      <Filter>SumTree</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

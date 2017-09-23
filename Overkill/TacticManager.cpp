@@ -25,7 +25,7 @@ void TacticManager::addTactic(tacticType tactic, BWAPI::Position attackPosition)
 	}
 	else if (tactic == DefendTactic)
 	{
-		BWAPI::Broodwar->printf("trigger defend!!!!");
+		//BWAPI::Broodwar->printf("trigger defend!!!!");
 		myTactic[tacKey(tactic, attackPosition)] = new ArmyDefendTactic();
 	}
 	else if (tactic == ScoutTac)
@@ -39,29 +39,11 @@ void TacticManager::addTactic(tacticType tactic, BWAPI::Position attackPosition)
 
 void TacticManager::addTacticUnit(tacticType tactic, BWAPI::Position attackPosition, BWAPI::Unit unit)
 {
-	if (myTactic.find(tacKey(tactic, attackPosition)) == myTactic.end())
+	if (myTactic.find(tacKey(tactic, attackPosition)) == myTactic.end() || !unit->exists())
 		return;
 	myTactic[tacKey(tactic, attackPosition)]->addArmyUnit(unit);
 }
 
-
-void TacticManager::addTacticArmyInternal(tacticType tactic, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, BWAPI::UnitType unitType, int count)
-{
-	if (myTactic.find(tacKey(tactic, attackPosition)) == myTactic.end() || count == 0)
-		return;
-
-	std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy = myTactic[tacKey(tactic, attackPosition)]->getArmy();
-	std::vector<UnitState>& targetArmy = tacticArmy[unitType]->getUnits();
-	std::vector<UnitState>& sourceArmy = Army[unitType]->getUnits();
-	
-	if (int(sourceArmy.size()) >= count)
-	{
-		targetArmy.insert(targetArmy.end(), sourceArmy.end() -= count, sourceArmy.end());
-		sourceArmy.erase(sourceArmy.end() -= count, sourceArmy.end());
-
-		//myTactic[tacKey(tactic, attackPosition)]->setGroupPosition(unitType, tactic);
-	}
-}
 
 void TacticManager::addTacticArmy(tacticType tactic, BWAPI::Position attackPosition, std::map<BWAPI::UnitType, BattleArmy*>& Army, BWAPI::UnitType unitType, int count)
 {
@@ -71,6 +53,18 @@ void TacticManager::addTacticArmy(tacticType tactic, BWAPI::Position attackPosit
 	std::map<BWAPI::UnitType, BattleArmy*>& tacticArmy = myTactic[tacKey(tactic, attackPosition)]->getArmy();
 	std::vector<UnitState>& targetArmy = tacticArmy[unitType]->getUnits();
 	std::vector<UnitState>& sourceArmy = Army[unitType]->getUnits();
+
+	for (std::vector<UnitState>::iterator it = sourceArmy.begin(); it != sourceArmy.end();)
+	{
+		if (!it->unit->exists())
+		{
+			it = sourceArmy.erase(it);
+		}
+		else
+		{
+			it++;
+		}
+	}
 
 	if (int(sourceArmy.size()) >= count)
 	{
@@ -92,7 +86,7 @@ void TacticManager::addTacticArmy(tacticType tactic, BWAPI::Position attackPosit
 			myTactic[tacKey(tactic, attackPosition)]->checkStartPositionEnemyInfo();
 		}
 
-		myTactic[tacKey(tactic, attackPosition)]->setGroupPosition(unitType, tactic);
+		//myTactic[tacKey(tactic, attackPosition)]->setGroupPosition(unitType, tactic);
 	}
 }
 
@@ -161,6 +155,14 @@ void TacticManager::onUnitDestroy(BWAPI::Unit unit)
 	}
 }
 
+void TacticManager::onLurkerMorph()
+{
+	for (auto t : myTactic)
+	{
+		t.second->onLurkerMorph();
+	}
+}
+
 
 void TacticManager::checkTacticEnd()
 {
@@ -226,8 +228,33 @@ void TacticManager::assignScoutZergling()
 }
 
 
+bool TacticManager::isAssignScoutZergling()
+{
+	ScoutTactic* scoutTac = dynamic_cast<ScoutTactic*>(myTactic.find(tacKey(ScoutTac, BWAPI::Positions::None))->second);
+	return scoutTac->HasZergling();
+}
+
+int TacticManager::addDefendArmyType(BattleTactic* tac, BWAPI::UnitType addArmyType, int needArmy, BWAPI::Position defendPosition)
+{
+	if (needArmy <= 0)
+	{
+		return needArmy;
+	}
+	int Remain = 0;
+	int Send = 0;
+	Remain = tac->getArmy()[addArmyType]->getUnits().size();
+	int armySupply = addArmyType.supplyRequired();
+	Send = needArmy / armySupply < Remain ? needArmy / armySupply : Remain;
+
+	addTacticArmy(DefendTactic, defendPosition, tac->getArmy(), addArmyType, Send);
+	needArmy -= Send * armySupply;
+	return needArmy;
+}
+
+
 void TacticManager::assignDefendArmy(BWAPI::Position defendPosition, int needSupply, bool allAirEnemy)
 {
+	int originSupply = needSupply;
 	BattleTactic* defendTac = myTactic.find(tacKey(DefendTactic, defendPosition))->second;
 	for (std::map<tacKey, BattleTactic*>::iterator it = myTactic.begin(); it != myTactic.end(); it++)
 	{
@@ -237,60 +264,28 @@ void TacticManager::assignDefendArmy(BWAPI::Position defendPosition, int needSup
 		{
 			if (it->first.tacName == MutaliskHarassTac)
 			{
-				//int mapWidth = BWAPI::Broodwar->mapWidth() * 32;
-				// not too far away from defend position
-				//if (currentArmyPosition.getDistance(defendPosition) < mapWidth / 2)
-				//{
-				int mutaliskRemain = 0;
-				int mutaliskSend = 0;
-				mutaliskRemain = it->second->getArmy()[BWAPI::UnitTypes::Zerg_Mutalisk]->getUnits().size();
-				mutaliskSend = needSupply / 4 < mutaliskRemain ? needSupply / 4 : mutaliskRemain;
-				if (mutaliskSend == mutaliskRemain)
-					it->second->setDefendEnd();
-
-				addTacticArmy(DefendTactic, defendPosition, it->second->getArmy(), BWAPI::UnitTypes::Zerg_Mutalisk, mutaliskSend);
-				needSupply -= mutaliskSend * 4;
-				//}
+				needSupply = addDefendArmyType(it->second, BWAPI::UnitTypes::Zerg_Mutalisk, needSupply, defendPosition);
 			}
 			else if (it->first.tacName == HydraliskPushTactic)
 			{
-				int hydraliskRemain = 0;
-				int hydraliskSend = 0;
-				//send the mutalisk to defend first, since mutalisk move fast
-				hydraliskRemain = it->second->getArmy()[BWAPI::UnitTypes::Zerg_Hydralisk]->getUnits().size();
-				hydraliskSend = needSupply / 2 < hydraliskRemain ? needSupply / 2 : hydraliskRemain;
-				needSupply -= hydraliskSend * 2;
-				addTacticArmy(DefendTactic, defendPosition, it->second->getArmy(), BWAPI::UnitTypes::Zerg_Hydralisk, hydraliskSend);
-
+				needSupply = addDefendArmyType(it->second, BWAPI::UnitTypes::Zerg_Mutalisk, needSupply, defendPosition);
+				needSupply = addDefendArmyType(it->second, BWAPI::UnitTypes::Zerg_Hydralisk, needSupply, defendPosition);
 				if (allAirEnemy == false)
 				{
-					int zerglingRemain = 0;
-					int zerglingSend = 0;
-					zerglingRemain = it->second->getArmy()[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size();
-					zerglingSend = needSupply < zerglingRemain ? needSupply : zerglingRemain;
-					if (zerglingSend == zerglingRemain)
-						it->second->setDefendEnd();
-
-					needSupply -= zerglingSend;
-					addTacticArmy(DefendTactic, defendPosition, it->second->getArmy(), BWAPI::UnitTypes::Zerg_Zergling, zerglingSend);
+					needSupply = addDefendArmyType(it->second, BWAPI::UnitTypes::Zerg_Lurker, needSupply, defendPosition);
+					needSupply = addDefendArmyType(it->second, BWAPI::UnitTypes::Zerg_Zergling, needSupply, defendPosition);
 				}
 			}
-			/*
-			else if (it->first.tacName == ZerglingHarassTac)
-			{
-				int zerglingRemain = 0;
-				int zerglingSend = 0;
-				zerglingRemain = it->second->getArmy()[BWAPI::UnitTypes::Zerg_Zergling]->getUnits().size();
-				zerglingSend = needSupply < zerglingRemain ? needSupply : zerglingRemain;
-				if (zerglingSend == zerglingRemain)
-					it->second->setDefendEnd();
-
-				needSupply -= zerglingSend;
-				addTacticArmy(DefendTactic, defendPosition, it->second->getArmy(), BWAPI::UnitTypes::Zerg_Zergling, zerglingSend);
-			}*/
-
 			else
 				continue;
+
+			//if assign army to defend, the remain army maybe not enough, so we need to attack this position again
+			if (originSupply - needSupply > 0)
+			{
+				it->second->setDefendEnd();
+			}
+			originSupply = needSupply;
 		}
+
 	}
 }

@@ -12,9 +12,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sixZerglingTactic.cpp">
-      <Filter>Attack</Filter>
-    </ClCompile>
     <ClCompile Include="TacticManager.cpp">
       <Filter>Attack</Filter>
     </ClCompile>
@@ -96,11 +93,14 @@
     <ClCompile Include="ScoutTactic.cpp">
       <Filter>Attack</Filter>
     </ClCompile>
+    <ClCompile Include="LurkerArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
+    <ClCompile Include="ScourgeArmy.cpp">
+      <Filter>Attack</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sixZerglingTactic.h">
-      <Filter>Attack</Filter>
-    </ClInclude>
     <ClInclude Include="TacticManager.h">
       <Filter>Attack</Filter>
     </ClInclude>
@@ -181,6 +181,21 @@
     </ClInclude>
     <ClInclude Include="ModelWeightInit.h">
       <Filter>Info</Filter>
+    </ClInclude>
+    <ClInclude Include="LurkerArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="ScourgeArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="UltraliskArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="DevourerArmy.h">
+      <Filter>Attack</Filter>
+    </ClInclude>
+    <ClInclude Include="GuardianArmy.h">
+      <Filter>Attack</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

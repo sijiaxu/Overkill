@@ -29,37 +29,6 @@ struct buildingInfo
 	{}
 };
 
-//for enemy influence map
-struct gridInfo
-{
-	double airForce;
-	double groundForce;
-
-	//indicate the distance from the attack building, used for path finding
-	double decayAirForce;
-	double decayGroundForce;
-
-	double enemyUnitAirForce;
-	double enemyUnitGroundForce;
-
-	double enemyUnitDecayAirForce;
-	double enemyUnitDecayGroundForce;
-	gridInfo()
-	{
-		airForce = 0;
-		groundForce = 0;
-
-		decayAirForce = 0;
-		decayGroundForce = 0;
-
-		enemyUnitAirForce = 0;
-		enemyUnitGroundForce = 0;
-
-		enemyUnitDecayAirForce = 0;
-		enemyUnitDecayGroundForce = 0;
-	}
-};
-
 
 class InformationManager {
 
@@ -83,7 +52,8 @@ class InformationManager {
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>			enemyAllBattleUnit;
 
 	//occupied region
-	std::set<BWTA::Region *>			occupiedRegions[2];
+	std::set<BWTA::Region*>			occupiedRegions[2];
+	std::set<BWTA::Region*>			fakeOccupiedRegions;
 
 	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>> selfOccupiedDetail;
 	std::map<BWTA::Region*, std::map<BWAPI::Unit, buildingInfo>> enemyOccupiedDetail;
@@ -139,6 +109,9 @@ class InformationManager {
 	int								buildZerglingChekcTime;
 	int								defendBuildZerglingsCount;
 
+	std::map<BWTA::Region*, int>	baseGroundDistance;
+	std::map<BWTA::Region*, int>	baseAirDistance;
+
 public:
 	void							setLocationEnemyBase(BWAPI::TilePosition Here);
 
@@ -151,9 +124,14 @@ public:
 	BWAPI::Position					GetEnemyBasePosition();
 	BWAPI::Position					GetEnemyNaturalPosition();
 
+	std::map<BWTA::Region*, int>& getBaseGroudDistance();
+	std::map<BWTA::Region*, int>& getBaseAirDistance();
+
+
 	BWAPI::TilePosition				GetNextExpandLocation();
 	std::set<BWTA::Region *> &		getOccupiedRegions(BWAPI::Player player);
 	
+	BWAPI::TilePosition				getOurBaseLocation() { return BWAPI::Broodwar->self()->getStartLocation(); }
 	BWAPI::TilePosition				getOurNatrualLocation();
 	BWAPI::TilePosition				getOurFirstColonyLocation() { return firstColonyLocation; }
 
@@ -161,9 +139,11 @@ public:
 	std::set<BWAPI::Unit>&			getEnemyAllBaseUnit() { return enemyAllBase; }
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBattleUnit() { return selfAllBattleUnit; }
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getOurAllBuildingUnit() { return selfAllBuilding; }
+	int								getOurTotalBattleForce();
+	int								getEnemyTotalAntiGroundBattleForce();
 
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBattleUnit() { return enemyAllBattleUnit; }
-	int								getEnemyGroundBattleUnitSupply();
+	
 	std::map<BWAPI::UnitType, std::set<BWAPI::Unit>>& getEnemyAllBuildingUnit() { return enemyAllBuilding; }
 	std::vector<std::vector<gridInfo>>& getEnemyInfluenceMap() { return enemyInfluenceMap; }
 
@@ -184,6 +164,9 @@ public:
 
 	static InformationManager&		Instance();
 	void							setDefend(bool status) { needDefendCheck = status;  if (needDefendCheck == true) BWAPI::Broodwar->printf("defend check open!!!!"); }
+
+	void							addFakeOccupiedBase(BWAPI::TilePosition b) { fakeOccupiedRegions.insert(BWTA::getRegion(b)); }
+	void							removeFakeOccupiedBase(BWAPI::TilePosition b) { fakeOccupiedRegions.erase(BWTA::getRegion(b)); }
 
 	void							update();
 };

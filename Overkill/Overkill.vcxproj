@@ -24,14 +24,15 @@
     <ClCompile Include="HydraliskArmy.cpp" />
     <ClCompile Include="HydraliskTactic.cpp" />
     <ClCompile Include="InformationManager.cpp" />
+    <ClCompile Include="LurkerArmy.cpp" />
     <ClCompile Include="MutaliskArmy.cpp" />
     <ClCompile Include="MutaliskHarassTactic.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="Overkill.cpp" />
     <ClCompile Include="OverLordArmy.cpp" />
     <ClCompile Include="ProductionManager.cpp" />
+    <ClCompile Include="ScourgeArmy.cpp" />
     <ClCompile Include="ScoutTactic.cpp" />
-    <ClCompile Include="sixZerglingTactic.cpp" />
     <ClCompile Include="StrategyManager.cpp" />
     <ClCompile Include="TacticManager.cpp" />
     <ClCompile Include="Time.cpp" />
@@ -50,9 +51,12 @@
     <ClInclude Include="BuildOrderQueue.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="DefendTactic.h" />
+    <ClInclude Include="DevourerArmy.h" />
+    <ClInclude Include="GuardianArmy.h" />
     <ClInclude Include="HydraliskArmy.h" />
     <ClInclude Include="HydraliskTactic.h" />
     <ClInclude Include="InformationManager.h" />
+    <ClInclude Include="LurkerArmy.h" />
     <ClInclude Include="MetaType.h" />
     <ClInclude Include="ModelWeightInit.h" />
     <ClInclude Include="MutaliskArmy.h" />
@@ -61,10 +65,11 @@
     <ClInclude Include="Overkill.h" />
     <ClInclude Include="OverLordArmy.h" />
     <ClInclude Include="ProductionManager.h" />
+    <ClInclude Include="ScourgeArmy.h" />
     <ClInclude Include="ScoutTactic.h" />
-    <ClInclude Include="sixZerglingTactic.h" />
     <ClInclude Include="StrategyManager.h" />
     <ClInclude Include="TacticManager.h" />
+    <ClInclude Include="UltraliskArmy.h" />
     <ClInclude Include="UnitState.h" />
     <ClInclude Include="WorkerData.h" />
     <ClInclude Include="WorkerManager.h" />
@@ -101,10 +106,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>..\..\..\TM\Starcraft\bwapi-data\AI</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\..\..\..\..\games\StarCraft\bwapi-data\AI</OutDir>
+    <OutDir>..\..\..\TM\Starcraft\bwapi-data\AI</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -113,12 +119,12 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;OVERKILL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(BWAPI_DIR)/include;$(BWTA_DIR)/include;$(BOOST_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../MachineLearning;$(BWAPI_DIR)/include;$(BWTA_DIR)/include;$(BOOST_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(BWAPI_DIR)/lib/BWAPI.lib;$(BWTA_DIR)/lib/BWTA.lib;$(BWTA_DIR)/lib/libboost_system-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libboost_thread-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libCGAL-vc120-mt-4.4.lib;$(BWTA_DIR)/lib/libgmp-10.lib;$(BWTA_DIR)/lib/libmpfr-4.lib;$(BWTA_DIR)/lib/libboost_filesystem-vc120-mt-1_56.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../Debug/MachineLearningModules_d.lib;$(BWAPI_DIR)/lib/BWAPId.lib;$(BWTA_DIR)/lib/BWTAd.lib;$(BWTA_DIR)/lib/libboost_system-vc120-mt-gd-1_56.lib;$(BWTA_DIR)/lib/libboost_thread-vc120-mt-gd-1_56.lib;$(BWTA_DIR)/lib/libCGAL-vc120-mt-gd-4.4.lib;$(BWTA_DIR)/lib/libgmp-10.lib;$(BWTA_DIR)/lib/libmpfr-4.lib;$(BWTA_DIR)/lib/libboost_filesystem-vc120-mt-gd-1_56.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -130,14 +136,14 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;OVERKILL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(BWTA_DIR)/include;$(BWAPI_DIR)/include;$(BOOST_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../MachineLearning;$(BWTA_DIR)/include;$(BWAPI_DIR)/include;$(BOOST_DIR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <OptimizeReferences>false</OptimizeReferences>
-      <AdditionalDependencies>$(BWAPI_DIR)/lib/BWAPI.lib;$(BWTA_DIR)/lib/BWTA.lib;$(BWTA_DIR)/lib/libboost_system-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libboost_thread-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libCGAL-vc120-mt-4.4.lib;$(BWTA_DIR)/lib/libgmp-10.lib;$(BWTA_DIR)/lib/libmpfr-4.lib;$(BWTA_DIR)/lib/libboost_filesystem-vc120-mt-1_56.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(BWAPI_DIR)/lib/BWAPI.lib;../Release/MachineLearningModules.lib;$(BWTA_DIR)/lib/BWTA.lib;$(BWTA_DIR)/lib/libboost_system-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libboost_thread-vc120-mt-1_56.lib;$(BWTA_DIR)/lib/libCGAL-vc120-mt-4.4.lib;$(BWTA_DIR)/lib/libgmp-10.lib;$(BWTA_DIR)/lib/libmpfr-4.lib;$(BWTA_DIR)/lib/libboost_filesystem-vc120-mt-1_56.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

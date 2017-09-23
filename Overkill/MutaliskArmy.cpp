@@ -2,128 +2,6 @@
 #include "InformationManager.h"
 
 
-void MutaliskArmy::defend(BWAPI::Position priorityPosition)
-{
-	if (units.size() == 0)
-		return;
-
-	//attack the target region, enemy's priority is decided by defend tactic
-	BWAPI::Unit unit = (*units.begin()).unit;
-	BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
-	int mutaliskSpeed = int(BWAPI::UnitTypes::Zerg_Mutalisk.topSpeed());
-
-	// loop through enemySet to get the top n target for n mutalisk group
-	std::vector<EnemyUnit> priorityEnemy;
-	priorityEnemy.reserve(100);
-
-	BOOST_FOREACH(BWAPI::Unit u, enemySet)
-	{
-		if (u->getPlayer() == BWAPI::Broodwar->enemy())
-		{
-			if (u->getType() == BWAPI::UnitTypes::Protoss_Observer)
-				continue;
-			if (int(u->getType().topSpeed()) >= mutaliskSpeed && !u->isAttacking() && BWTA::getRegion(u->getPosition()) != BWTA::getRegion(priorityPosition))
-				continue;
-
-			priorityEnemy.push_back(EnemyUnit(u, getAttackPriority(u), u->getDistance(unit)));
-		}
-	}
-
-	if (priorityEnemy.size() == 0)
-	{
-		BOOST_FOREACH(UnitState& u, units)
-		{
-			smartAttackMove(u.unit, priorityPosition);
-		}
-	}
-	else
-	{
-		std::sort(priorityEnemy.begin(), priorityEnemy.end());
-		mutaliskAssignTarget(priorityEnemy);
-	}
-}
-
-
-void MutaliskArmy::mixArmyAttack(BWAPI::Position priorityPosition)
-{
-	//get the group attack target
-	if (units.size() == 0)
-		return;
-
-	BWAPI::Unit unit = (*units.begin()).unit;
-
-	BWAPI::Unitset enemySet = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 12 * 32);
-
-	// loop through enemySet to get the top n target for n mutalisk group
-	std::vector<EnemyUnit> priorityEnemy;
-	priorityEnemy.reserve(100);
-
-	BOOST_FOREACH(BWAPI::Unit u, enemySet)
-	{
-		if (u->getPlayer() == BWAPI::Broodwar->enemy())
-		{	//get the high priority and closed to priorityPosition unit
-			priorityEnemy.push_back(EnemyUnit(u, getAttackPriority(u), int(priorityPosition.getDistance(u->getPosition()))));
-		}
-	}
-
-	if (priorityEnemy.size() == 0)
-	{
-		BOOST_FOREACH(UnitState& u, units)
-		{
-			smartAttackMove(u.unit, priorityPosition);
-		}
-	}
-	else
-	{
-		std::sort(priorityEnemy.begin(), priorityEnemy.end());
-		mutaliskAssignTarget(priorityEnemy);
-	}
-}
-
-
-//attack strategy for mutalisk. 
-//unlike the ground unit, mutalisk attack the high priority target first(in the unit's circle and target circle),
-void MutaliskArmy::attack(BWAPI::Position priorityPosition)
-{
-	//get the group attack target
-	if (units.size() == 0)
-		return;
-
-	BWAPI::Unit unit = (*units.begin()).unit;
-	BWAPI::Broodwar->drawCircleMap(unit->getPosition().x, unit->getPosition().y, 8 * 32, BWAPI::Colors::Purple, false);
-	BWAPI::Broodwar->drawCircleMap(priorityPosition.x, priorityPosition.y, 8 * 32, BWAPI::Colors::Purple, false);
-
-	BWAPI::Unitset enemySet = unit->getUnitsInRadius(12 * 32);
-	//std::set<BWAPI::Unit> enemySetInCircle = BWAPI::Broodwar->getUnitsInRadius(priorityPosition, 8 * 32);
-
-	//enemySet.insert(enemySetInCircle.begin(), enemySetInCircle.end());
-
-	// loop through enemySet to get the top n target for n mutalisk group
-	std::vector<EnemyUnit> priorityEnemy;
-	priorityEnemy.reserve(100);
-	
-	BOOST_FOREACH(BWAPI::Unit u, enemySet)
-	{
-		if (u->getPlayer() == BWAPI::Broodwar->enemy())
-		{	
-			priorityEnemy.push_back(EnemyUnit(u, getAttackPriority(u), u->getDistance(unit)));
-		}
-	}
-
-	if (priorityEnemy.size() == 0)
-	{
-		BOOST_FOREACH(UnitState& u, units)
-		{
-			smartAttackMove(u.unit, priorityPosition);
-		}
-	}
-	else
-	{
-		std::sort(priorityEnemy.begin(), priorityEnemy.end());
-		mutaliskAssignTarget(priorityEnemy);
-	}
-}
-
 
 BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit target, bool avoidCannon)
 {
@@ -205,6 +83,12 @@ BWAPI::Position MutaliskArmy::findSafePlace(BWAPI::Unit target, bool avoidCannon
 
 void MutaliskArmy::mutaliskFSM(UnitState& myUnit, BWAPI::Unit target)
 {
+	if (myUnit.unit->isIrradiated() || myUnit.unit->isUnderStorm())
+	{
+		smartMove(myUnit.unit, BWAPI::Position(BWAPI::Broodwar->self()->getStartLocation()));
+		return;
+	}
+
 	std::vector<std::vector<gridInfo>>& influnceMap = InformationManager::Instance().getEnemyInfluenceMap();
 	int deltaMove = 0;
 	char jobCode;
@@ -428,7 +312,7 @@ bool MutaliskArmy::harassAttack(BWAPI::Position priorityPosition, int attackMode
 
 void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 {
-	moveAbnormalUnits();
+	//moveAbnormalUnits();
 
 	//if there are too many enemy exist, select top 30 enemy.
 	if (priorityEnemy.size() >= 30)
@@ -455,11 +339,6 @@ void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 			{
 				while (needMutaCount > 0)
 				{
-					if (units[mutaIndex].state == Irradiated)
-					{
-						continue;
-					}
-
 					mutaliskFSM(units[mutaIndex], priorityEnemy[i].unit);
 					needMutaCount--;
 					mutaIndex++;
@@ -469,11 +348,6 @@ void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 			{
 				while (mutaIndex < int(units.size()))
 				{
-					if (units[mutaIndex].state == Irradiated)
-					{
-						continue;
-					}
-
 					mutaliskFSM(units[mutaIndex], priorityEnemy[i].unit);
 					mutaIndex++;
 				}
@@ -485,11 +359,6 @@ void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 		{
 			while (mutaIndex < int(units.size()))
 			{
-				if (units[mutaIndex].state == Irradiated)
-				{
-					continue;
-				}
-
 				mutaliskFSM(units[mutaIndex], priorityEnemy[i].unit);
 				mutaIndex++;
 			}
@@ -497,6 +366,8 @@ void MutaliskArmy::mutaliskAssignTarget(std::vector<EnemyUnit>& priorityEnemy)
 		}
 	}
 }
+
+
 
 int MutaliskArmy::harassAttackPriority(BWAPI::Unit unit)
 {
@@ -578,24 +449,28 @@ int MutaliskArmy::harassAttackPriority(BWAPI::Unit unit)
 int MutaliskArmy::getAttackPriority(BWAPI::Unit unit)
 {
 	BWAPI::UnitType type = unit->getType();
+	if (type == BWAPI::UnitTypes::Zerg_Egg || type == BWAPI::UnitTypes::Zerg_Larva)
+	{
+		return 0;
+	}
 
 	// highest priority is something that can attack us or aid in combat
 
-	if (type == BWAPI::UnitTypes::Terran_Siege_Tank_Siege_Mode
-		|| type == BWAPI::UnitTypes::Protoss_High_Templar)
+	if (type == BWAPI::UnitTypes::Protoss_High_Templar)
 	{
 		return 14;
 	}
-	else if (type == BWAPI::UnitTypes::Terran_Siege_Tank_Tank_Mode)
+	else if ((type.airWeapon() != BWAPI::WeaponTypes::None && type.isFlyer()) ||
+		type == BWAPI::UnitTypes::Protoss_Carrier)
 	{
 		return 13;
 	}
-	else if ((type.airWeapon() != BWAPI::WeaponTypes::None) ||
-		type == BWAPI::UnitTypes::Protoss_Carrier)
+	else if (type.airWeapon() != BWAPI::WeaponTypes::None && !type.isFlyer())
 	{
 		return 12;
 	}
-	else if (type == BWAPI::UnitTypes::Terran_Bunker)
+
+	else if (type == BWAPI::UnitTypes::Terran_Bunker || type == BWAPI::UnitTypes::Terran_Siege_Tank_Tank_Mode)
 	{
 		return 11;
 	}

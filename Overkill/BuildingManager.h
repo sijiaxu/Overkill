@@ -45,13 +45,14 @@ class BuildingManager {
 	// functions for performing tedious vector tasks
 
 	char						getBuildingWorkerCode(const Building & b) const;
+	void						builderNotExist(Building& b);
 
 public:
 
 	void						update();
 	void						onUnitMorph(BWAPI::Unit unit);
 	void						onUnitDestroy(BWAPI::Unit unit);
-	void						addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition desiredLocation);
+	void						addBuildingTask(BWAPI::UnitType type, BWAPI::TilePosition desiredLocation, std::vector<MetaType> waitingBuildType = std::vector<MetaType>());
 
 	//for predict move 
 	BWAPI::TilePosition			getBuildingLocation( Building & b);
